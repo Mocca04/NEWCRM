@@ -6,12 +6,15 @@ import { switchTenant } from './actions';
 
 export default async function PanelLayout({ children }: { children: ReactNode }) {
   const { me, active } = await getWorkspace();
+  // En celular solo caben cuatro secciones: Sucursales y Equipo se abren desde Negocio.
   const nav = active && (
     <>
       <NavLink href="/panel" label="Inicio" exact />
-      <NavLink href="/panel/sucursales" label="Sucursales" />
-      <NavLink href="/panel/equipo" label="Equipo" />
-      <NavLink href="/panel/empresa" label="Negocio" />
+      <NavLink href="/panel/servicios" label="Servicios" />
+      <NavLink href="/panel/profesionales" label="Profesionales" />
+      <NavLink href="/panel/sucursales" label="Sucursales" desktopOnly />
+      <NavLink href="/panel/equipo" label="Equipo" desktopOnly />
+      <NavLink href="/panel/empresa" label="Negocio" alsoCurrentOnMobile={['/panel/sucursales', '/panel/equipo']} />
     </>
   );
 

@@ -1,0 +1,33 @@
+name: Aplicar migraciones
+
+# Se ejecuta a mano: pestaña Actions > "Aplicar migraciones" > Run workflow.
+# Aplica las migraciones pendientes a la base indicada en el secreto
+# PRODUCTION_DATABASE_URL (Settings > Secrets and variables > Actions).
+on:
+  workflow_dispatch:
+
+concurrency: migrate
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Comprobar que el secreto existe
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Falta el secreto PRODUCTION_DATABASE_URL. Ver docs/despliegue.md"
+            exit 1
+          fi
+      - name: Aplicar migraciones
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: pnpm --filter @newcrm/database migrate

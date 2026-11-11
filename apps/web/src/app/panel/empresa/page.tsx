@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ActionForm, Field } from '@/components/action-form';
 import { api, can, requireWorkspace } from '@/lib/api';
 import { updateTenant } from '../actions';
@@ -11,6 +12,10 @@ export default async function TenantPage() {
 
   return (
     <div className="max-w-lg space-y-8">
+      <nav aria-label="Más secciones del negocio" className="divide-y divide-line rounded-2xl border border-line bg-white lg:hidden">
+        <Link href="/panel/sucursales" className="block px-5 py-4 font-semibold">Sucursales</Link>
+        <Link href="/panel/equipo" className="block px-5 py-4 font-semibold">Equipo</Link>
+      </nav>
       <div>
         <h1 className="text-4xl font-bold">Datos del negocio</h1>
         <p className="mt-3 text-ink-soft">

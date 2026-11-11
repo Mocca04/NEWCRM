@@ -62,6 +62,7 @@ export interface Harness {
     post(path: string, body?: object): request.Test;
     patch(path: string, body?: object): request.Test;
     put(path: string, body?: object): request.Test;
+    delete(path: string): request.Test;
   };
   close(): Promise<void>;
 }
@@ -91,7 +92,7 @@ export async function createHarness(): Promise<Harness> {
   setupApp(app);
   await app.init();
 
-  const send = (method: 'get' | 'post' | 'patch' | 'put', email: string, tenantId: string | undefined, path: string, body?: object) => {
+  const send = (method: 'get' | 'post' | 'patch' | 'put' | 'delete', email: string, tenantId: string | undefined, path: string, body?: object) => {
     let req = request(app.getHttpServer())[method](`/api/v1${path}`).set('Authorization', `Bearer ${idp.token(email)}`);
     if (tenantId) req = req.set('X-Tenant-Id', tenantId);
     return body ? req.send(body) : req;
@@ -106,6 +107,7 @@ export async function createHarness(): Promise<Harness> {
       post: (path, body) => send('post', email, tenantId, path, body ?? {}),
       patch: (path, body) => send('patch', email, tenantId, path, body ?? {}),
       put: (path, body) => send('put', email, tenantId, path, body ?? {}),
+      delete: (path) => send('delete', email, tenantId, path),
     }),
     close: async () => {
       await app.close();

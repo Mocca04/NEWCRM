@@ -27,13 +27,14 @@ export default async function PanelHome() {
       <section>
         <h2 className="text-xl font-bold">Lo que ya puedes dejar listo</h2>
         <ul className="mt-3 divide-y divide-line rounded-2xl border border-line bg-white">
+          <li><Link href="/panel/servicios" className="block px-5 py-4 font-semibold hover:bg-mirror">Cargar tus servicios y precios</Link></li>
+          <li><Link href="/panel/profesionales" className="block px-5 py-4 font-semibold hover:bg-mirror">Agregar a tus profesionales y sus horarios</Link></li>
           <li><Link href="/panel/empresa" className="block px-5 py-4 font-semibold hover:bg-mirror">Completar los datos del negocio</Link></li>
-          <li><Link href="/panel/sucursales" className="block px-5 py-4 font-semibold hover:bg-mirror">Revisar tus sucursales</Link></li>
           {can(active, 'members.manage') && (
             <li><Link href="/panel/equipo" className="block px-5 py-4 font-semibold hover:bg-mirror">Dar acceso a tu equipo</Link></li>
           )}
         </ul>
-        <p className="mt-4 text-ink-soft">Servicios, profesionales y agenda llegan en la siguiente entrega.</p>
+        <p className="mt-4 text-ink-soft">La agenda y las reservas llegan en la siguiente entrega.</p>
       </section>
     </div>
   );

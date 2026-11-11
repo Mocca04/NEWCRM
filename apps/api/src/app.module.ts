@@ -4,6 +4,9 @@ import { AuthGuard } from './auth/auth.guard';
 import { remoteJwks, SupabaseTokenVerifier, TOKEN_VERIFIER } from './auth/token-verifier';
 import { APP_CONFIG, AppConfig } from './config';
 import { DatabaseModule } from './database/database.module';
+import { CatalogController } from './modules/catalog/catalog.controller';
+import { EmployeesController } from './modules/employees/employees.controller';
+import { SchedulingController } from './modules/scheduling/scheduling.controller';
 import { BranchesController } from './modules/branches/branches.controller';
 import { HealthController } from './modules/health/health.controller';
 import { MeController } from './modules/me/me.controller';
@@ -14,7 +17,7 @@ import { TenantGuard } from './tenancy/tenant.guard';
 
 @Module({
   imports: [DatabaseModule],
-  controllers: [HealthController, MeController, TenantsController, BranchesController, MembersController, RolesController],
+  controllers: [HealthController, MeController, TenantsController, BranchesController, MembersController, RolesController, CatalogController, EmployeesController, SchedulingController],
   providers: [
     {
       provide: TOKEN_VERIFIER,

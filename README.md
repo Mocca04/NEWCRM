@@ -2,7 +2,7 @@
 
 Plataforma SaaS de agenda, CRM y fidelización para manicuristas, barberías, peluquerías y estilistas en Colombia.
 
-Estado: **fase 2 de 14**. Están listos el modelo de datos, la API de identidad, empresas, sucursales, miembros y roles, y el panel web para esas mismas funciones. El avance detallado está en [docs/PROGRESO.md](docs/PROGRESO.md).
+Estado: **fases 1 a 3 de 14**. Están listos el modelo de datos, la API y el panel web de identidad, empresas, sucursales, equipo, servicios, profesionales y horarios. Falta la agenda (fase 4) y un entorno desplegado.
 
 ## Qué hay en el repositorio
 

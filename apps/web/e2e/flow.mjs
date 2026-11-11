@@ -17,6 +17,15 @@ const step = async (name, fn) => {
 };
 const shot = async (page, name) => SHOTS && page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 const submit = (page, label) => page.getByRole('button', { name: label, exact: true }).click();
+// En celular, Sucursales y Equipo se abren desde Negocio; en computador están en el menú.
+const open = async (page, name) => {
+  if (!(await page.getByRole('link', { name, exact: true }).first().isVisible())) {
+    await page.getByRole('link', { name: 'Negocio', exact: true }).click();
+    await page.getByRole('heading', { name: 'Datos del negocio' }).waitFor();
+  }
+  await page.getByRole('link', { name, exact: true }).first().click();
+};
+const card = (page, tag, heading) => page.locator(tag, { has: page.getByRole('heading', { name: heading, exact: true }) });
 
 try {
   const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
@@ -56,7 +65,7 @@ try {
   });
 
   await step('sucursales: la principal existe y el plan frena la segunda', async () => {
-    await page.getByRole('link', { name: 'Sucursales', exact: true }).click();
+    await open(page, 'Sucursales');
     await page.getByRole('heading', { name: 'Principal' }).waitFor();
     const add = page.locator('section', { hasText: 'Agregar sucursal' });
     await add.getByLabel('Nombre').fill('Sede Norte');
@@ -74,7 +83,7 @@ try {
   });
 
   await step('equipo: dar acceso a una recepcionista', async () => {
-    await page.getByRole('link', { name: 'Equipo', exact: true }).click();
+    await open(page, 'Equipo');
     const invite = page.locator('section', { hasText: 'Dar acceso a alguien' });
     await invite.getByLabel('Nombre').fill('Laura Rios');
     await invite.getByLabel('Correo').fill('laura@example.com');
@@ -95,6 +104,63 @@ try {
     await shot(page, 'movil-negocio');
   });
 
+  await step('servicios: cargar la lista de barbería', async () => {
+    await page.getByRole('link', { name: 'Servicios', exact: true }).click();
+    await shot(page, 'movil-servicios-vacio');
+    await submit(page, 'Barbería');
+    await page.getByRole('heading', { name: 'Corte y barba', exact: true }).waitFor();
+    assert.equal(await page.getByText('Sin precio', { exact: true }).count(), 6);
+  });
+
+  await step('servicios: no se publica un servicio sin precio', async () => {
+    const barba = card(page, 'li', 'Barba');
+    await barba.getByText('Editar', { exact: true }).click();
+    await barba.getByLabel('Mostrarlo a los clientes').check();
+    await barba.getByRole('button', { name: 'Guardar cambios' }).click();
+    await barba.getByRole('alert').filter({ hasText: 'Ponle precio' }).waitFor();
+  });
+
+  await step('servicios: poner precio y publicar', async () => {
+    const corte = card(page, 'li', 'Corte');
+    await corte.getByText('Editar', { exact: true }).click();
+    await corte.getByLabel('Precio').fill('25000');
+    await corte.getByLabel('Limpieza después').fill('5');
+    await corte.getByLabel('Mostrarlo a los clientes').check();
+    await corte.getByRole('button', { name: 'Guardar cambios' }).click();
+    await corte.getByText(/25\.000/).first().waitFor();
+    assert.equal(await page.getByText('Sin precio', { exact: true }).count(), 5);
+    await shot(page, 'movil-servicios');
+  });
+
+  await step('profesionales: agregar con sus servicios', async () => {
+    await page.getByRole('link', { name: 'Profesionales', exact: true }).click();
+    const add = page.locator('section', { hasText: 'Agregar profesional' });
+    await add.getByLabel('Nombre').fill('Camilo Paz');
+    await add.getByLabel('Corte', { exact: true }).check();
+    await add.getByRole('button', { name: 'Agregar profesional' }).click();
+    await add.getByRole('status').filter({ hasText: 'Camilo Paz agregado' }).waitFor();
+    await card(page, 'li', 'Camilo Paz').getByText('Sin horario').waitFor();
+  });
+
+  await step('profesionales: horario con descanso, y aviso si falta una hora', async () => {
+    const camilo = card(page, 'li', 'Camilo Paz');
+    await camilo.getByText('Horario', { exact: true }).click();
+    await camilo.getByLabel('Martes', { exact: true }).check();
+    await camilo.getByRole('button', { name: 'Guardar horario' }).click();
+    await camilo.getByRole('alert').filter({ hasText: 'del martes' }).waitFor();
+    await camilo.getByLabel('Martes', { exact: true }).uncheck();
+    await camilo.getByLabel('Lunes', { exact: true }).check();
+    await camilo.getByLabel('Lunes: hora de entrada').fill('09:00');
+    await camilo.getByLabel('Lunes: hora de salida').fill('18:00');
+    await camilo.getByLabel('Lunes: inicio del descanso').fill('13:00');
+    await camilo.getByLabel('Lunes: fin del descanso').fill('14:00');
+    await camilo.getByRole('button', { name: 'Guardar horario' }).click();
+    await camilo.getByText('09:00 a 13:00 y 14:00 a 18:00').waitFor();
+    await shot(page, 'movil-profesionales');
+    await page.getByRole('link', { name: 'Servicios', exact: true }).click();
+    await card(page, 'li', 'Corte').getByText('1 profesional').waitFor();
+  });
+
   await step('cerrar sesión y contraseña equivocada', async () => {
     await submit(page, 'Cerrar sesión');
     await page.waitForURL('**/login');
@@ -112,13 +178,20 @@ try {
     await submit(page, 'Crear cuenta');
     await page.waitForURL(/\/panel$/);
     await page.getByText('Estudio Sofia', { exact: true }).first().waitFor();
-    await page.getByRole('link', { name: 'Equipo', exact: true }).click();
+    await open(page, 'Equipo');
     await page.getByText('no puede ver ni cambiar los accesos').waitFor();
-    await page.getByRole('link', { name: 'Sucursales', exact: true }).click();
+    await open(page, 'Sucursales');
     await page.getByRole('heading', { name: 'Principal' }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'Agregar sucursal' }).count(), 0);
     await page.getByRole('link', { name: 'Negocio', exact: true }).click();
     assert.equal(await page.getByLabel('Teléfono').isDisabled(), true);
+    await page.getByRole('link', { name: 'Servicios', exact: true }).click();
+    await page.getByRole('heading', { name: 'Corte', exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Agregar servicio' }).count(), 0);
+    assert.equal(await page.getByText('Editar', { exact: true }).count(), 0);
+    await page.getByRole('link', { name: 'Profesionales', exact: true }).click();
+    await page.getByRole('heading', { name: 'Camilo Paz' }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Agregar profesional' }).count(), 0);
   });
 
   await step('vista de escritorio', async () => {
@@ -133,6 +206,9 @@ try {
     await wide.getByRole('link', { name: 'Equipo', exact: true }).click();
     await wide.getByRole('heading', { name: 'Laura Rios' }).waitFor();
     await shot(wide, 'escritorio-equipo');
+    await wide.getByRole('link', { name: 'Profesionales', exact: true }).click();
+    await wide.getByRole('heading', { name: 'Camilo Paz' }).waitFor();
+    await shot(wide, 'escritorio-profesionales');
   });
 
   console.log(`\n${steps.length} pasos correctos`);
