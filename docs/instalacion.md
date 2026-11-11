@@ -32,7 +32,7 @@ Las pruebas crean y destruyen su propia base (`newcrm_test`); no tocan la base d
    ```
 
    La prueba "toda tabla con tenant_id tiene RLS" falla si se olvida la primera línea.
-4. Revisar que el SQL generado no intente borrar restricciones de exclusión, disparadores ni políticas: Prisma no los conoce (ver errores conocidos en `docs/PROGRESO.md`).
+4. Ejecutar `pnpm --filter @newcrm/database migrate:check`: debe responder "No difference detected".
 
 ## Usar Supabase en lugar de Docker
 

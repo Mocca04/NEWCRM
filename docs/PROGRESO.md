@@ -1,6 +1,6 @@
 # Documento de progreso
 
-Última actualización: 10 de noviembre de 2026 · Fase en curso: **1, pendiente de revisión**
+Última actualización: 10 de noviembre de 2026 · Fase 1 **terminada y verificada en integración continua**; sigue la fase 2
 
 ## Funcionalidades terminadas
 
@@ -20,15 +20,19 @@
 
 ## Errores conocidos y puntos sin verificar
 
-1. **Prisma no se ha ejecutado contra este esquema.** El entorno donde se construyó la fase 1 no permite descargar los motores de Prisma, así que `prisma validate`, `prisma generate` y `prisma migrate deploy` nunca corrieron. Lo que sí se comprobó: el esquema se analiza sin errores con la librería interna de Prisma, y el SQL de las migraciones se aplicó y probó directamente en PostgreSQL. La primera ejecución de la integración continua es la que confirma los tres comandos.
-2. **La migración inicial no la generó `prisma migrate`.** Se generó con un script a partir de `schema.prisma` siguiendo las convenciones de nombres de Prisma. Si Prisma hubiera producido algo distinto, el paso "Verificar que las migraciones coinciden" lo mostrará.
-3. **Restricciones de exclusión y Prisma.** No está confirmado si `prisma migrate dev` intentará borrar los índices que respaldan las restricciones de exclusión. Por eso ese paso de la integración continua no bloquea todavía. Hasta confirmarlo, revisar a mano cada migración nueva.
-4. **Probado en PostgreSQL 16.** `docker-compose.yml` y la integración continua usan la versión 17; no se probó en ella.
-5. **Versiones.** Se fijó Prisma 7.10.1 (decisión 7) y TypeScript 5.9, porque las herramientas de pruebas aún no admiten TypeScript 7. NestJS va por la versión 12, no la 11 que figura en el documento de arquitectura; se usará la 12 en la fase 2.
+Ninguno abierto. Los cinco puntos que quedaron sin verificar al construir la fase 1 se resolvieron en la primera ejecución de la integración continua (11 de noviembre de 2026):
+
+- `prisma validate`, `prisma generate` y `prisma migrate deploy` corren sin errores sobre una base vacía.
+- `prisma migrate diff` reporta "No difference detected": las migraciones escritas a mano coinciden con `schema.prisma`, y Prisma no intenta borrar las restricciones de exclusión, los disparadores ni las políticas. Ese paso ahora bloquea la integración continua.
+- Las 32 pruebas pasan también en PostgreSQL 17.
+
+Notas de versiones: Prisma fijado en 7.10.1 (decisión 7) y TypeScript en 5.9, porque las herramientas de pruebas aún no admiten TypeScript 7. NestJS va por la versión 12; se usará esa en la fase 2.
+
+Limitación del entorno de desarrollo de Claude: no puede descargar los motores de Prisma, así que los comandos de Prisma solo se verifican en la integración continua de GitHub.
 
 ## Pruebas realizadas
 
-32 pruebas automáticas contra PostgreSQL 16 real, todas en verde (`pnpm test`):
+32 pruebas automáticas contra PostgreSQL real (versiones 16 y 17), todas en verde (`pnpm test`):
 
 | Área | Qué comprueba | Escenario del prompt |
 | --- | --- | --- |
@@ -49,13 +53,11 @@ Los escenarios 7 a 12 dependen de módulos de fases posteriores.
 
 | Necesidad | Para | Estado |
 | --- | --- | --- |
-| Permiso de escritura de Claude en el repositorio de GitHub | Subir el código y ver la integración continua | Ver nota de entrega |
 | Proyecto de Supabase | Fase 2: autenticación y base de datos alojada | Por crear |
 | Apple Developer, emisor de Google Wallet, Wompi | Etapa 2 | Trámites por iniciar |
 | Meta Business verificado | Etapa 3 | Trámite por iniciar |
 
 ## Próximas tareas
 
-1. Confirmar en verde la primera ejecución de la integración continua y resolver los puntos 1 a 3 de errores conocidos.
-2. Revisión de la fase 1 contigo.
-3. Fase 2: `apps/api` con NestJS, autenticación con Supabase, empresas, sucursales, miembros, roles y permisos; cliente Prisma con contexto de empresa; escenarios 2 y 10 a nivel de API.
+1. Revisión de la fase 1 contigo.
+2. Fase 2: `apps/api` con NestJS, autenticación con Supabase, empresas, sucursales, miembros, roles y permisos; cliente Prisma con contexto de empresa; escenarios 2 y 10 a nivel de API.

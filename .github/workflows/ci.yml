@@ -38,9 +38,6 @@ jobs:
       - name: Aplicar migraciones con Prisma sobre una base vacia
         run: pnpm --filter @newcrm/database migrate
       - name: Verificar que las migraciones coinciden con schema.prisma
-        # No bloquea hasta confirmar en la primera ejecucion como reporta Prisma
-        # las restricciones de exclusion (ver docs/PROGRESO.md, errores conocidos).
-        continue-on-error: true
         run: pnpm --filter @newcrm/database migrate:check
       - name: Revision de tipos
         run: pnpm typecheck
