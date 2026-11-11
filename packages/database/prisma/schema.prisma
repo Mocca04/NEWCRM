@@ -1,0 +1,1119 @@
+// Esquema de datos de la plataforma. Ver docs/arquitectura.md.
+// Convenciones: UUID como clave primaria, tenant_id en toda tabla de empresa,
+// dinero en enteros (centavos de COP), fechas en timestamptz.
+// RLS, restricciones de exclusion, disparadores y ledger inalterable viven en
+// SQL dentro de prisma/migrations (Prisma no los modela).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────── Enumeraciones ─────────────────────────
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  FAILED
+  VOID
+}
+
+enum ServiceVertical {
+  MANICURE
+  BARBERSHOP
+  HAIR_SALON
+  OTHER
+}
+
+enum TimeBlockKind {
+  BLOCK
+  BREAK
+  VACATION
+  HOLIDAY
+}
+
+enum ConsentKind {
+  DATA_PROCESSING
+  MARKETING
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum AppointmentSource {
+  PANEL
+  PORTAL
+  WALK_IN
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+  GATEWAY
+}
+
+enum PaymentKind {
+  PAYMENT
+  DEPOSIT
+  REFUND
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  VOIDED
+}
+
+enum CommissionStatus {
+  PENDING
+  SETTLED
+  VOIDED
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+  WALLET
+  WEB
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum LoyaltyCampaignType {
+  STAMPS
+  POINTS
+}
+
+enum LoyaltyCardStatus {
+  ACTIVE
+  COMPLETED
+  EXPIRED
+  REVOKED
+}
+
+enum LedgerEntryType {
+  ACCRUAL
+  REDEMPTION
+  EXPIRATION
+  REVERSAL
+  ADJUSTMENT
+  BONUS
+}
+
+enum RedemptionStatus {
+  REQUESTED
+  APPROVED
+  USED
+  CANCELLED
+  EXPIRED
+}
+
+enum WalletPlatform {
+  APPLE
+  GOOGLE
+}
+
+enum WalletPassStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum JobStatus {
+  PENDING
+  DONE
+  FAILED
+}
+
+// ─────────────── Plataforma, identidad y acceso ───────────────
+
+model Tenant {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tradeName     String       @map("trade_name")
+  legalName     String?      @map("legal_name")
+  nit           String?      @unique
+  slug          String       @unique
+  ownerName     String?      @map("owner_name")
+  email         String
+  phone         String?
+  city          String?
+  address       String?
+  logoUrl       String?      @map("logo_url")
+  coverUrl      String?      @map("cover_url")
+  socialLinks   Json?        @map("social_links")
+  businessHours Json?        @map("business_hours")
+  status        TenantStatus @default(ACTIVE)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  branches             Branch[]
+  memberships          TenantMembership[]
+  roles                Role[]
+  rolePermissions      RolePermission[]
+  subscriptions        Subscription[]
+  subscriptionInvoices SubscriptionInvoice[]
+  auditLogs            AuditLog[]
+  serviceCategories    ServiceCategory[]
+  services             Service[]
+  servicePrices        ServicePrice[]
+  employees            Employee[]
+  employeeServices     EmployeeService[]
+  employeeSchedules    EmployeeSchedule[]
+  timeBlocks           TimeBlock[]
+  resources            Resource[]
+  customers            Customer[]
+  consents             Consent[]
+  appointments         Appointment[]
+  appointmentServices  AppointmentService[]
+  appointmentResources AppointmentResource[]
+  cashSessions         CashSession[]
+  payments             Payment[]
+  commissions          Commission[]
+  notifications        Notification[]
+  loyaltyProgram       LoyaltyProgram?
+  loyaltyCampaigns     LoyaltyCampaign[]
+  loyaltyCards         LoyaltyCard[]
+  loyaltyVisits        LoyaltyVisit[]
+  loyaltyLedger        LoyaltyLedgerEntry[]
+  rewards              Reward[]
+  rewardRedemptions    RewardRedemption[]
+  walletPasses         WalletPass[]
+  walletDevices        WalletDevice[]
+  walletUpdateEvents   WalletUpdateEvent[]
+  outboxEvents         OutboxEvent[]
+  idempotencyKeys      IdempotencyKey[]
+  webhookEvents        WebhookEvent[]
+
+  @@map("tenants")
+}
+
+model Branch {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  name                String
+  city                String?
+  address             String?
+  phone               String?
+  timezone            String    @default("America/Bogota")
+  businessHours       Json?     @map("business_hours")
+  slotIntervalMinutes Int       @default(15) @map("slot_interval_minutes")
+  isActive            Boolean   @default(true) @map("is_active")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  employees         Employee[]
+  employeeSchedules EmployeeSchedule[]
+  servicePrices     ServicePrice[]
+  timeBlocks        TimeBlock[]
+  resources         Resource[]
+  appointments      Appointment[]
+  cashSessions      CashSession[]
+
+  @@unique([tenantId, name])
+  @@map("branches")
+}
+
+/// Personal de los establecimientos y de la plataforma. Tabla global.
+model User {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authProviderId  String   @unique @map("auth_provider_id")
+  email           String   @unique
+  fullName        String   @map("full_name")
+  phone           String?
+  isPlatformAdmin Boolean  @default(false) @map("is_platform_admin")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  memberships TenantMembership[]
+  employees   Employee[]
+
+  @@map("users")
+}
+
+model TenantMembership {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  /// Sucursales permitidas. Vacio = todas.
+  branchIds String[] @default([]) @map("branch_ids") @db.Uuid
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+  @@map("tenant_memberships")
+}
+
+model Role {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  isSystem  Boolean  @default(false) @map("is_system")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id])
+  memberships TenantMembership[]
+  permissions RolePermission[]
+
+  @@unique([tenantId, name])
+  @@map("roles")
+}
+
+/// Catalogo global de codigos de permiso (appointments.read, cash.close, ...).
+model Permission {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String @unique
+  description String
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  tenantId     String @map("tenant_id") @db.Uuid
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@index([tenantId])
+  @@map("role_permissions")
+}
+
+/// Planes SaaS. Tabla global administrada por el superadministrador.
+model SubscriptionPlan {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code         String   @unique
+  name         String
+  priceMonthly Int      @map("price_monthly")
+  priceYearly  Int      @map("price_yearly")
+  maxEmployees Int?     @map("max_employees")
+  maxBranches  Int?     @map("max_branches")
+  features     Json     @default("{}")
+  trialDays    Int      @default(0) @map("trial_days")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  subscriptions Subscription[]
+
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String             @map("tenant_id") @db.Uuid
+  planId             String             @map("plan_id") @db.Uuid
+  billingCycle       BillingCycle       @map("billing_cycle")
+  status             SubscriptionStatus
+  trialEndsAt        DateTime?          @map("trial_ends_at") @db.Timestamptz(3)
+  currentPeriodStart DateTime           @map("current_period_start") @db.Timestamptz(3)
+  currentPeriodEnd   DateTime           @map("current_period_end") @db.Timestamptz(3)
+  cancelAtPeriodEnd  Boolean            @default(false) @map("cancel_at_period_end")
+  paymentSourceRef   String?            @map("payment_source_ref")
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant   Tenant                @relation(fields: [tenantId], references: [id])
+  plan     SubscriptionPlan      @relation(fields: [planId], references: [id])
+  invoices SubscriptionInvoice[]
+
+  @@index([tenantId])
+  @@map("subscriptions")
+}
+
+model SubscriptionInvoice {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String        @map("tenant_id") @db.Uuid
+  subscriptionId   String        @map("subscription_id") @db.Uuid
+  periodStart      DateTime      @map("period_start") @db.Timestamptz(3)
+  periodEnd        DateTime      @map("period_end") @db.Timestamptz(3)
+  amount           Int
+  status           InvoiceStatus @default(PENDING)
+  attempts         Int           @default(0)
+  gatewayReference String?       @map("gateway_reference")
+  paidAt           DateTime?     @map("paid_at") @db.Timestamptz(3)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@unique([subscriptionId, periodStart])
+  @@index([tenantId])
+  @@map("subscription_invoices")
+}
+
+/// Solo insercion (lo impone un disparador). tenant_id nulo = accion de plataforma.
+model AuditLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String?  @map("tenant_id") @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  before      Json?
+  after       Json?
+  ip          String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("audit_logs")
+}
+
+// ───────────────────── Catalogo y personal ─────────────────────
+
+model ServiceCategory {
+  id        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String          @map("tenant_id") @db.Uuid
+  name      String
+  vertical  ServiceVertical @default(OTHER)
+  sortOrder Int             @default(0) @map("sort_order")
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  services Service[]
+
+  @@unique([tenantId, name])
+  @@map("service_categories")
+}
+
+model Service {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  categoryId      String    @map("category_id") @db.Uuid
+  name            String
+  description     String?
+  imageUrl        String?   @map("image_url")
+  price           Int
+  durationMinutes Int       @map("duration_minutes")
+  prepMinutes     Int       @default(0) @map("prep_minutes")
+  cleanupMinutes  Int       @default(0) @map("cleanup_minutes")
+  depositAmount   Int       @default(0) @map("deposit_amount")
+  /// Tipo de recurso que ocupa (silla, cabina...). Nulo = no requiere.
+  resourceType    String?   @map("resource_type")
+  isPublic        Boolean   @default(true) @map("is_public")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  category            ServiceCategory      @relation(fields: [categoryId], references: [id])
+  prices              ServicePrice[]
+  employees           EmployeeService[]
+  appointmentServices AppointmentService[]
+
+  @@index([tenantId, categoryId])
+  @@map("services")
+}
+
+/// Precio o duracion distintos por profesional y/o sucursal.
+model ServicePrice {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  serviceId       String   @map("service_id") @db.Uuid
+  employeeId      String?  @map("employee_id") @db.Uuid
+  branchId        String?  @map("branch_id") @db.Uuid
+  price           Int
+  durationMinutes Int?     @map("duration_minutes")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id])
+  branch   Branch?   @relation(fields: [branchId], references: [id])
+
+  @@index([tenantId, serviceId])
+  @@map("service_prices")
+}
+
+model Employee {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  branchId          String    @map("branch_id") @db.Uuid
+  userId            String?   @map("user_id") @db.Uuid
+  fullName          String    @map("full_name")
+  photoUrl          String?   @map("photo_url")
+  specialties       String[]  @default([])
+  commissionPercent Decimal   @default(0) @map("commission_percent") @db.Decimal(5, 2)
+  isActive          Boolean   @default(true) @map("is_active")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  branch              Branch               @relation(fields: [branchId], references: [id])
+  user                User?                @relation(fields: [userId], references: [id])
+  services            EmployeeService[]
+  schedules           EmployeeSchedule[]
+  servicePrices       ServicePrice[]
+  timeBlocks          TimeBlock[]
+  appointmentServices AppointmentService[]
+  commissions         Commission[]
+
+  @@index([tenantId, branchId])
+  @@map("employees")
+}
+
+model EmployeeService {
+  tenantId   String @map("tenant_id") @db.Uuid
+  employeeId String @map("employee_id") @db.Uuid
+  serviceId  String @map("service_id") @db.Uuid
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([employeeId, serviceId])
+  @@index([tenantId])
+  @@map("employee_services")
+}
+
+/// Horario semanal. weekday: 0 = domingo ... 6 = sabado.
+model EmployeeSchedule {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  branchId   String   @map("branch_id") @db.Uuid
+  weekday    Int
+  startTime  DateTime @map("start_time") @db.Time(0)
+  endTime    DateTime @map("end_time") @db.Time(0)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  branch   Branch   @relation(fields: [branchId], references: [id])
+
+  @@index([tenantId, employeeId, weekday])
+  @@map("employee_schedules")
+}
+
+/// Bloqueos, descansos, vacaciones y festivos. Sin employee_id aplica a toda la sucursal.
+model TimeBlock {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String        @map("tenant_id") @db.Uuid
+  branchId   String?       @map("branch_id") @db.Uuid
+  employeeId String?       @map("employee_id") @db.Uuid
+  kind       TimeBlockKind @default(BLOCK)
+  startsAt   DateTime      @map("starts_at") @db.Timestamptz(3)
+  endsAt     DateTime      @map("ends_at") @db.Timestamptz(3)
+  reason     String?
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  branch   Branch?   @relation(fields: [branchId], references: [id])
+  employee Employee? @relation(fields: [employeeId], references: [id])
+
+  @@index([tenantId, startsAt, endsAt])
+  @@map("time_blocks")
+}
+
+/// Cada fila es una unidad fisica (silla 1, cabina 2).
+model Resource {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  branchId  String   @map("branch_id") @db.Uuid
+  name      String
+  type      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant       Tenant                @relation(fields: [tenantId], references: [id])
+  branch       Branch                @relation(fields: [branchId], references: [id])
+  appointments AppointmentResource[]
+
+  @@index([tenantId, branchId])
+  @@map("resources")
+}
+
+// ─────────────────── Clientes, agenda y pagos ───────────────────
+
+/// Identidad global del cliente final (un telefono). Tabla global.
+model CustomerAccount {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phone           String    @unique
+  email           String?
+  phoneVerifiedAt DateTime? @map("phone_verified_at") @db.Timestamptz(3)
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  customers Customer[]
+
+  @@map("customer_accounts")
+}
+
+/// Ficha del cliente dentro de una empresa.
+model Customer {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  accountId      String?   @map("account_id") @db.Uuid
+  fullName       String    @map("full_name")
+  phone          String?
+  email          String?
+  birthDate      DateTime? @map("birth_date") @db.Date
+  notes          String?
+  marketingOptIn Boolean   @default(false) @map("marketing_opt_in")
+  lastVisitAt    DateTime? @map("last_visit_at") @db.Timestamptz(3)
+  anonymizedAt   DateTime? @map("anonymized_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant       Tenant               @relation(fields: [tenantId], references: [id])
+  account      CustomerAccount?     @relation(fields: [accountId], references: [id])
+  consents     Consent[]
+  appointments Appointment[]
+  payments     Payment[]
+  notifications Notification[]
+  loyaltyCards LoyaltyCard[]
+  ledger       LoyaltyLedgerEntry[]
+  redemptions  RewardRedemption[]
+
+  @@unique([tenantId, phone])
+  @@index([tenantId, lastVisitAt])
+  @@map("customers")
+}
+
+model Consent {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String      @map("tenant_id") @db.Uuid
+  customerId    String      @map("customer_id") @db.Uuid
+  kind          ConsentKind
+  policyVersion String      @map("policy_version")
+  channel       String
+  grantedAt     DateTime    @default(now()) @map("granted_at") @db.Timestamptz(3)
+  revokedAt     DateTime?   @map("revoked_at") @db.Timestamptz(3)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([tenantId, customerId])
+  @@map("consents")
+}
+
+model Appointment {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String            @map("tenant_id") @db.Uuid
+  branchId           String            @map("branch_id") @db.Uuid
+  customerId         String            @map("customer_id") @db.Uuid
+  status             AppointmentStatus @default(PENDING)
+  source             AppointmentSource @default(PANEL)
+  startsAt           DateTime          @map("starts_at") @db.Timestamptz(3)
+  endsAt             DateTime          @map("ends_at") @db.Timestamptz(3)
+  totalAmount        Int               @default(0) @map("total_amount")
+  depositAmount      Int               @default(0) @map("deposit_amount")
+  /// Si hay anticipo pendiente, la reserva se libera a esta hora.
+  holdExpiresAt      DateTime?         @map("hold_expires_at") @db.Timestamptz(3)
+  /// Copia de la politica vigente al reservar.
+  cancellationPolicy Json?             @map("cancellation_policy")
+  recurrenceSeriesId String?           @map("recurrence_series_id") @db.Uuid
+  notes              String?
+  cancelReason       String?           @map("cancel_reason")
+  cancelledAt        DateTime?         @map("cancelled_at") @db.Timestamptz(3)
+  completedAt        DateTime?         @map("completed_at") @db.Timestamptz(3)
+  createdBy          String?           @map("created_by") @db.Uuid
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant      Tenant                @relation(fields: [tenantId], references: [id])
+  branch      Branch                @relation(fields: [branchId], references: [id])
+  customer    Customer              @relation(fields: [customerId], references: [id])
+  services    AppointmentService[]
+  resources   AppointmentResource[]
+  payments    Payment[]
+  visits      LoyaltyVisit[]
+  ledger      LoyaltyLedgerEntry[]
+  redemptions RewardRedemption[]
+
+  @@index([tenantId, branchId, startsAt])
+  @@index([tenantId, customerId])
+  @@map("appointments")
+}
+
+/// Linea de servicio de una cita. occupied_* incluye preparacion y limpieza;
+/// una restriccion de exclusion impide solapes del mismo profesional.
+model AppointmentService {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  appointmentId String   @map("appointment_id") @db.Uuid
+  serviceId     String   @map("service_id") @db.Uuid
+  employeeId    String   @map("employee_id") @db.Uuid
+  price         Int
+  startsAt      DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt        DateTime @map("ends_at") @db.Timestamptz(3)
+  occupiedStart DateTime @map("occupied_start") @db.Timestamptz(3)
+  occupiedEnd   DateTime @map("occupied_end") @db.Timestamptz(3)
+  /// Lo mantiene un disparador segun el estado de la cita.
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  service     Service     @relation(fields: [serviceId], references: [id])
+  employee    Employee    @relation(fields: [employeeId], references: [id])
+  commission  Commission?
+
+  @@index([tenantId, appointmentId])
+  @@index([tenantId, employeeId, startsAt])
+  @@map("appointment_services")
+}
+
+model AppointmentResource {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  appointmentId String   @map("appointment_id") @db.Uuid
+  resourceId    String   @map("resource_id") @db.Uuid
+  occupiedStart DateTime @map("occupied_start") @db.Timestamptz(3)
+  occupiedEnd   DateTime @map("occupied_end") @db.Timestamptz(3)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  resource    Resource    @relation(fields: [resourceId], references: [id])
+
+  @@index([tenantId, appointmentId])
+  @@map("appointment_resources")
+}
+
+model CashSession {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  branchId       String    @map("branch_id") @db.Uuid
+  openedBy       String    @map("opened_by") @db.Uuid
+  closedBy       String?   @map("closed_by") @db.Uuid
+  openedAt       DateTime  @default(now()) @map("opened_at") @db.Timestamptz(3)
+  closedAt       DateTime? @map("closed_at") @db.Timestamptz(3)
+  openingAmount  Int       @default(0) @map("opening_amount")
+  expectedAmount Int?      @map("expected_amount")
+  closingAmount  Int?      @map("closing_amount")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  branch   Branch    @relation(fields: [branchId], references: [id])
+  payments Payment[]
+
+  @@index([tenantId, branchId])
+  @@map("cash_sessions")
+}
+
+/// Un pago aprobado no se edita: un reembolso es otra fila (kind REFUND, monto negativo).
+model Payment {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String        @map("tenant_id") @db.Uuid
+  appointmentId    String?       @map("appointment_id") @db.Uuid
+  customerId       String?       @map("customer_id") @db.Uuid
+  cashSessionId    String?       @map("cash_session_id") @db.Uuid
+  method           PaymentMethod
+  kind             PaymentKind   @default(PAYMENT)
+  amount           Int
+  status           PaymentStatus @default(APPROVED)
+  gateway          String?
+  gatewayReference String?       @map("gateway_reference")
+  refundOfId       String?       @map("refund_of_id") @db.Uuid
+  receivedBy       String?       @map("received_by") @db.Uuid
+  notes            String?
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+  cashSession CashSession? @relation(fields: [cashSessionId], references: [id])
+  refundOf    Payment?     @relation("PaymentRefunds", fields: [refundOfId], references: [id])
+  refunds     Payment[]    @relation("PaymentRefunds")
+
+  @@unique([tenantId, gateway, gatewayReference])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, appointmentId])
+  @@map("payments")
+}
+
+model Commission {
+  id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId             String           @map("tenant_id") @db.Uuid
+  employeeId           String           @map("employee_id") @db.Uuid
+  appointmentServiceId String           @unique @map("appointment_service_id") @db.Uuid
+  baseAmount           Int              @map("base_amount")
+  percent              Decimal          @db.Decimal(5, 2)
+  amount               Int
+  status               CommissionStatus @default(PENDING)
+  settledAt            DateTime?        @map("settled_at") @db.Timestamptz(3)
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant             Tenant             @relation(fields: [tenantId], references: [id])
+  employee           Employee           @relation(fields: [employeeId], references: [id])
+  appointmentService AppointmentService @relation(fields: [appointmentServiceId], references: [id])
+
+  @@index([tenantId, employeeId])
+  @@map("commissions")
+}
+
+model Notification {
+  id         String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String              @map("tenant_id") @db.Uuid
+  customerId String?             @map("customer_id") @db.Uuid
+  channel    NotificationChannel
+  template   String
+  /// Identifica el hecho que origina el envio; evita repetirlo.
+  eventKey   String              @map("event_key")
+  recipient  String
+  status     NotificationStatus  @default(QUEUED)
+  attempts   Int                 @default(0)
+  error      String?
+  sentAt     DateTime?           @map("sent_at") @db.Timestamptz(3)
+  createdAt  DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  @@unique([tenantId, eventKey, channel, recipient])
+  @@index([tenantId, status])
+  @@map("notifications")
+}
+
+// ───────────────────── Fidelizacion y Wallet ─────────────────────
+
+model LoyaltyProgram {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @unique @map("tenant_id") @db.Uuid
+  stampsEnabled Boolean  @default(false) @map("stamps_enabled")
+  pointsEnabled Boolean  @default(false) @map("points_enabled")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id])
+  campaigns LoyaltyCampaign[]
+
+  @@map("loyalty_programs")
+}
+
+/// rules (JSON validado en el backend): meta de visitas, servicios y sucursales
+/// elegibles, valor del punto, multiplicadores, vencimiento, reinicio.
+model LoyaltyCampaign {
+  id        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String              @map("tenant_id") @db.Uuid
+  programId String              @map("program_id") @db.Uuid
+  type      LoyaltyCampaignType
+  name      String
+  rules     Json                @default("{}")
+  startsAt  DateTime?           @map("starts_at") @db.Timestamptz(3)
+  endsAt    DateTime?           @map("ends_at") @db.Timestamptz(3)
+  isActive  Boolean             @default(true) @map("is_active")
+  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id])
+  program LoyaltyProgram @relation(fields: [programId], references: [id])
+  cards   LoyaltyCard[]
+  visits  LoyaltyVisit[]
+  rewards Reward[]
+
+  @@index([tenantId, isActive])
+  @@map("loyalty_campaigns")
+}
+
+/// Tarjeta de un cliente en una campana. Los saldos son cache del ledger.
+model LoyaltyCard {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String            @map("tenant_id") @db.Uuid
+  customerId    String            @map("customer_id") @db.Uuid
+  campaignId    String            @map("campaign_id") @db.Uuid
+  stampsBalance Int               @default(0) @map("stamps_balance")
+  pointsBalance Int               @default(0) @map("points_balance")
+  status        LoyaltyCardStatus @default(ACTIVE)
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant      Tenant               @relation(fields: [tenantId], references: [id])
+  customer    Customer             @relation(fields: [customerId], references: [id])
+  campaign    LoyaltyCampaign      @relation(fields: [campaignId], references: [id])
+  visits      LoyaltyVisit[]
+  ledger      LoyaltyLedgerEntry[]
+  redemptions RewardRedemption[]
+  passes      WalletPass[]
+
+  @@unique([tenantId, customerId, campaignId])
+  @@map("loyalty_cards")
+}
+
+/// Un sello por cita y campana.
+model LoyaltyVisit {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  cardId        String   @map("card_id") @db.Uuid
+  campaignId    String   @map("campaign_id") @db.Uuid
+  appointmentId String   @map("appointment_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  card        LoyaltyCard     @relation(fields: [cardId], references: [id])
+  campaign    LoyaltyCampaign @relation(fields: [campaignId], references: [id])
+  appointment Appointment     @relation(fields: [appointmentId], references: [id])
+
+  @@unique([appointmentId, campaignId])
+  @@index([tenantId, cardId])
+  @@map("loyalty_visits")
+}
+
+/// Libro de movimientos inalterable (solo insercion, lo impone un disparador).
+/// Un movimiento esta revertido si existe otro que lo referencia en reverses_id.
+model LoyaltyLedgerEntry {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String          @map("tenant_id") @db.Uuid
+  cardId         String          @map("card_id") @db.Uuid
+  customerId     String          @map("customer_id") @db.Uuid
+  appointmentId  String?         @map("appointment_id") @db.Uuid
+  type           LedgerEntryType
+  pointsDelta    Int             @default(0) @map("points_delta")
+  stampsDelta    Int             @default(0) @map("stamps_delta")
+  /// Usuario del personal responsable, si aplica.
+  actorUserId    String?         @map("actor_user_id") @db.Uuid
+  reason         String?
+  reference      String?
+  idempotencyKey String          @map("idempotency_key")
+  reversesId     String?         @unique @map("reverses_id") @db.Uuid
+  expiresAt      DateTime?       @map("expires_at") @db.Timestamptz(3)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id])
+  card        LoyaltyCard         @relation(fields: [cardId], references: [id])
+  customer    Customer            @relation(fields: [customerId], references: [id])
+  appointment Appointment?        @relation(fields: [appointmentId], references: [id])
+  reverses    LoyaltyLedgerEntry? @relation("LedgerReversal", fields: [reversesId], references: [id])
+  reversedBy  LoyaltyLedgerEntry? @relation("LedgerReversal")
+  redemption  RewardRedemption?
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, cardId, createdAt])
+  @@map("loyalty_points_ledger")
+}
+
+model Reward {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  campaignId       String   @map("campaign_id") @db.Uuid
+  name             String
+  description      String?
+  pointsCost       Int?     @map("points_cost")
+  requiresFullCard Boolean  @default(false) @map("requires_full_card")
+  monetaryValue    Int?     @map("monetary_value")
+  restrictions     Json?
+  validDays        Int?     @map("valid_days")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id])
+  campaign    LoyaltyCampaign    @relation(fields: [campaignId], references: [id])
+  redemptions RewardRedemption[]
+
+  @@index([tenantId, campaignId])
+  @@map("rewards")
+}
+
+model RewardRedemption {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String           @map("tenant_id") @db.Uuid
+  rewardId          String           @map("reward_id") @db.Uuid
+  cardId            String           @map("card_id") @db.Uuid
+  customerId        String           @map("customer_id") @db.Uuid
+  status            RedemptionStatus @default(REQUESTED)
+  /// Hash del codigo de validacion; el codigo en claro nunca se guarda.
+  codeHash          String           @map("code_hash")
+  codeExpiresAt     DateTime         @map("code_expires_at") @db.Timestamptz(3)
+  validatedBy       String?          @map("validated_by") @db.Uuid
+  usedAt            DateTime?        @map("used_at") @db.Timestamptz(3)
+  usedAppointmentId String?          @map("used_appointment_id") @db.Uuid
+  ledgerEntryId     String?          @unique @map("ledger_entry_id") @db.Uuid
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant          Tenant              @relation(fields: [tenantId], references: [id])
+  reward          Reward              @relation(fields: [rewardId], references: [id])
+  card            LoyaltyCard         @relation(fields: [cardId], references: [id])
+  customer        Customer            @relation(fields: [customerId], references: [id])
+  usedAppointment Appointment?        @relation(fields: [usedAppointmentId], references: [id])
+  ledgerEntry     LoyaltyLedgerEntry? @relation(fields: [ledgerEntryId], references: [id])
+
+  @@index([tenantId, customerId])
+  @@index([tenantId, status])
+  @@map("reward_redemptions")
+}
+
+/// Un pase persistente por tarjeta y plataforma.
+model WalletPass {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String           @map("tenant_id") @db.Uuid
+  cardId       String           @map("card_id") @db.Uuid
+  platform     WalletPlatform
+  serialNumber String           @unique @map("serial_number")
+  authToken    String           @map("auth_token")
+  /// Token opaco del QR: sin datos personales ni saldos. Rotable.
+  barcodeToken String           @unique @map("barcode_token")
+  status       WalletPassStatus @default(ACTIVE)
+  /// true = generado por el adaptador de pruebas, no por Apple/Google.
+  isSandbox    Boolean          @default(true) @map("is_sandbox")
+  lastSyncedAt DateTime?        @map("last_synced_at") @db.Timestamptz(3)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant  Tenant              @relation(fields: [tenantId], references: [id])
+  card    LoyaltyCard         @relation(fields: [cardId], references: [id])
+  devices WalletDevice[]
+  updates WalletUpdateEvent[]
+
+  @@unique([cardId, platform])
+  @@index([tenantId])
+  @@map("wallet_passes")
+}
+
+/// Dispositivos Apple registrados para recibir actualizaciones de un pase.
+model WalletDevice {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  passId          String   @map("pass_id") @db.Uuid
+  deviceLibraryId String   @map("device_library_id")
+  pushToken       String   @map("push_token")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id])
+  pass   WalletPass @relation(fields: [passId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceLibraryId, passId])
+  @@index([tenantId])
+  @@map("wallet_devices")
+}
+
+model WalletUpdateEvent {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  passId    String    @map("pass_id") @db.Uuid
+  reason    String
+  status    JobStatus @default(PENDING)
+  attempts  Int       @default(0)
+  lastError String?   @map("last_error")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id])
+  pass   WalletPass @relation(fields: [passId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([tenantId])
+  @@map("wallet_update_events")
+}
+
+// ─────────────────────── Infraestructura ───────────────────────
+
+/// Outbox transaccional: se escribe en la misma transaccion del cambio.
+model OutboxEvent {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String?   @map("tenant_id") @db.Uuid
+  type        String
+  payload     Json
+  dedupeKey   String?   @unique @map("dedupe_key")
+  status      JobStatus @default(PENDING)
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(3)
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([tenantId])
+  @@map("outbox_events")
+}
+
+model IdempotencyKey {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  scope          String
+  key            String
+  requestHash    String   @map("request_hash")
+  responseStatus Int?     @map("response_status")
+  responseBody   Json?    @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, scope, key])
+  @@map("idempotency_keys")
+}
+
+model WebhookEvent {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String?   @map("tenant_id") @db.Uuid
+  provider       String
+  externalId     String    @map("external_id")
+  signatureValid Boolean   @map("signature_valid")
+  payload        Json
+  status         JobStatus @default(PENDING)
+  lastError      String?   @map("last_error")
+  receivedAt     DateTime  @default(now()) @map("received_at") @db.Timestamptz(3)
+  processedAt    DateTime? @map("processed_at") @db.Timestamptz(3)
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@unique([provider, externalId])
+  @@index([tenantId])
+  @@map("webhook_events")
+}

@@ -1,0 +1,13 @@
+{
+  "name": "newcrm",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:migrate": "pnpm --filter @newcrm/database migrate",
+    "db:generate": "pnpm --filter @newcrm/database generate",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
