@@ -52,9 +52,20 @@ jobs:
         run: pnpm --filter @newcrm/database migrate
       - name: Verificar que las migraciones coinciden con schema.prisma
         run: pnpm --filter @newcrm/database migrate:check
+      - name: Compilar la web
+        run: pnpm --filter @newcrm/web build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54399
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: llave-de-pruebas
+          NEXT_TELEMETRY_DISABLED: 1
       - name: Revision de tipos
         run: pnpm typecheck
       - name: Pruebas contra PostgreSQL
         run: pnpm test
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      - name: Recorrido de punta a punta en navegador
+        run: pnpm --filter @newcrm/web e2e
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          E2E_REBUILD: 1

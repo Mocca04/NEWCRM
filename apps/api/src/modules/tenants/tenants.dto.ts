@@ -2,13 +2,13 @@ import { ApiProperty, ApiPropertyOptional, PartialType, OmitType } from '@nestjs
 import { IsEmail, IsIn, IsObject, IsOptional, IsString, IsUrl, Length, Matches } from 'class-validator';
 
 export class CreateTenantDto {
-  @ApiProperty({ example: 'Barberia El Patio' })
+  @ApiProperty({ example: 'Barbería El Patio' })
   @IsString()
   @Length(2, 80)
   tradeName: string;
 
-  @ApiProperty({ example: 'barberia-el-patio', description: 'Direccion publica: plataforma.com/<slug>' })
-  @Matches(/^[a-z0-9]+(-[a-z0-9]+)*$/, { message: 'slug: solo minusculas, numeros y guiones' })
+  @ApiProperty({ example: 'barberia-el-patio', description: 'Dirección publica: plataforma.com/<slug>' })
+  @Matches(/^[a-z0-9]+(-[a-z0-9]+)*$/, { message: 'slug: solo minúsculas, números y guiones' })
   @Length(3, 40)
   slug: string;
 
@@ -50,7 +50,7 @@ export class UpdateTenantDto extends PartialType(OmitType(CreateTenantDto, ['slu
 
   @ApiPropertyOptional()
   @IsOptional()
-  @Matches(/^[0-9]{6,12}(-[0-9])?$/, { message: 'nit: solo numeros, con digito de verificacion opcional' })
+  @Matches(/^[0-9]{6,12}(-[0-9])?$/, { message: 'nit: solo números, con dígito de verificación opcional' })
   nit?: string;
 
   @ApiPropertyOptional()

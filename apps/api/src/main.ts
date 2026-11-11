@@ -18,7 +18,7 @@ async function bootstrap(): Promise<void> {
   SwaggerModule.setup('api/docs', app, document);
 
   await app.listen(config.port);
-  console.log(`API en http://localhost:${config.port}/api/v1 · documentacion en /api/docs`);
+  console.log(`API en http://localhost:${config.port}/api/v1 · documentación en /api/docs`);
 }
 
 void bootstrap();

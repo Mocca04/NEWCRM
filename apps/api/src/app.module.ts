@@ -26,7 +26,7 @@ import { TenantGuard } from './tenancy/tenant.guard';
           hmacSecret: config.supabaseJwtSecret,
         }),
     },
-    // El orden importa: primero quien es, despues a que empresa entra y con que permisos.
+    // El orden importa: primero quien es, después a que empresa entra y con que permisos.
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: TenantGuard },
   ],

@@ -25,14 +25,14 @@ export class TenantsController {
   @Post('tenants')
   @ApiOperation({ summary: 'Registrar un establecimiento. Quien lo crea queda como Propietario.' })
   async create(@CurrentUser() user: AuthUser, @Body() dto: CreateTenantDto) {
-    if (RESERVED_SLUGS.has(dto.slug)) throw new ConflictException('Esa direccion no esta disponible');
+    if (RESERVED_SLUGS.has(dto.slug)) throw new ConflictException('Esa dirección no está disponible');
     const now = new Date();
     const trialEndsAt = new Date(now.getTime() + this.config.defaultTrialDays * 86_400_000);
 
-    // Operacion de plataforma: la empresa aun no existe, no hay contexto RLS.
+    // Operacion de plataforma: la empresa aún no existe, no hay contexto RLS.
     return this.db.platform.$transaction(async (tx) => {
       if (await tx.tenant.findUnique({ where: { slug: dto.slug }, select: { id: true } })) {
-        throw new ConflictException('Esa direccion ya esta en uso');
+        throw new ConflictException('Esa dirección ya está en uso');
       }
       const plan = await tx.subscriptionPlan.findUniqueOrThrow({ where: { code: dto.planCode ?? 'negocio' } });
       const tenant = await tx.tenant.create({

@@ -15,7 +15,7 @@ export class InviteMemberDto {
   @IsUUID()
   roleId: string;
 
-  @ApiPropertyOptional({ description: 'Sucursales permitidas. Vacio o ausente = todas.' })
+  @ApiPropertyOptional({ description: 'Sucursales permitidas. Vacío o ausente = todas.' })
   @IsOptional()
   @IsArray()
   @ArrayUnique()

@@ -14,14 +14,14 @@ export interface TenantContext {
   roleId: string;
   roleName: string;
   permissions: ReadonlySet<string>;
-  /** Sucursales permitidas. Vacio = todas. */
+  /** Sucursales permitidas. Vacío = todas. */
   branchIds: readonly string[];
 }
 
 export type AppRequest = Request & { user?: AuthUser; tenant?: TenantContext };
 
 export const IS_PUBLIC = 'isPublic';
-/** Ruta sin autenticacion. */
+/** Ruta sin autenticación. */
 export const Public = () => SetMetadata(IS_PUBLIC, true);
 
 export const NO_TENANT = 'noTenant';

@@ -12,7 +12,7 @@ export interface AuditEntry {
 
 const json = (value: unknown) => (value === undefined ? undefined : (JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue));
 
-/** Registra una accion sensible en la misma transaccion que el cambio. */
+/** Registra una acción sensible en la misma transacción que el cambio. */
 export async function audit(tx: Tx, entry: AuditEntry): Promise<void> {
   await tx.auditLog.create({
     data: {

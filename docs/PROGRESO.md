@@ -1,6 +1,6 @@
 # Documento de progreso
 
-Última actualización: 11 de noviembre de 2026 · Fase 1 terminada · Fase 2: **API terminada, interfaz web pendiente**
+Última actualización: 11 de noviembre de 2026 · Fase 1 terminada · Fase 2: **API y panel web terminados; falta probarlos contra Supabase real en un entorno desplegado**
 
 ## Funcionalidades terminadas
 
@@ -25,17 +25,25 @@
 - Auditoría de altas, cambios de rol, permisos y datos de empresa.
 - Cliente Prisma con contexto de empresa (`forTenant`).
 
-Rutas: `GET /health`, `GET /me`, `POST /tenants`, `GET|PATCH /tenant`, `GET|POST /branches`, `PATCH /branches/:id`, `POST /branches/:id/deactivate|activate`, `GET|POST /members`, `PATCH /members/:id`, `GET /permissions`, `GET|POST /roles`, `PUT /roles/:id/permissions`.
+Panel web (`apps/web`, Next.js 16):
+
+- Crear cuenta, iniciar y cerrar sesión con Supabase Auth; confirmación de correo por enlace.
+- Registro del negocio en un paso.
+- Inicio, Sucursales (agregar, editar, desactivar, reactivar), Equipo (dar acceso, cambiar rol, quitar acceso) y Negocio (datos).
+- Cada pantalla muestra solo lo que el rol permite; el token de sesión nunca llega al navegador más allá de la cookie de Supabase: todas las llamadas a la API salen del servidor de la web.
+- Pensado primero para celular: barra de secciones abajo, campos grandes; en computador, menú lateral.
+
+Rutas de la API: `GET /health`, `GET /me`, `POST /tenants`, `GET|PATCH /tenant`, `GET|POST /branches`, `PATCH /branches/:id`, `POST /branches/:id/deactivate|activate`, `GET|POST /members`, `PATCH /members/:id`, `GET /permissions`, `GET|POST /roles`, `PUT /roles/:id/permissions`.
 
 ## Funcionalidades pendientes
 
-- Fase 2: `apps/web` (inicio de sesión, registro de empresa, pantallas de sucursales y miembros).
+- Fase 2: recuperación de contraseña, envío de correo al invitar a un miembro, edición de roles personalizados y selector de negocio en celular (la API ya los soporta salvo el correo).
 - Fase 2: eliminación de una empresa y transferencia de propiedad.
 - Fases 3 a 14. Ver el plan en el documento de arquitectura.
 
 ## Errores conocidos y puntos sin verificar
 
-1. **Inicio de sesión real con Supabase sin probar.** El entorno de desarrollo de Claude no puede conectarse a `supabase.co`. Las pruebas firman tokens con el mismo formato de Supabase (ES256) usando una llave local, y la API los valida con su verificador real; lo que falta comprobar es un inicio de sesión de verdad contra el proyecto. Se comprueba al conectar la interfaz web.
+1. **Inicio de sesión real con Supabase sin probar.** El entorno de desarrollo de Claude no puede conectarse a `supabase.co`. Las pruebas usan un sustituto local de Supabase Auth (`apps/web/e2e/fake-supabase.mjs`, solo para pruebas) que emite tokens con el mismo formato (ES256); la API los valida con su verificador real. Falta comprobar registro, confirmación de correo e inicio de sesión contra el proyecto verdadero. Eso solo se puede hacer con la web desplegada o corriendo en un computador con internet.
 2. **Proyectos antiguos de Supabase (HS256).** Hay soporte con `SUPABASE_JWT_SECRET`, pero esa ruta no tiene prueba automática.
 3. **El periodo de prueba no vence solo.** La empresa nace con una suscripción en prueba; el corte al vencer llega con la fase 11.
 
@@ -49,7 +57,7 @@ Notas de versiones y entorno:
 
 ## Pruebas realizadas
 
-54 pruebas automáticas contra PostgreSQL real, todas en verde (`pnpm test`): 36 de base de datos y 18 de la API de extremo a extremo.
+54 pruebas automáticas contra PostgreSQL real, todas en verde (`pnpm test`): 36 de base de datos y 18 de la API de extremo a extremo. Además, un recorrido de 11 pasos en un navegador real (`pnpm --filter @newcrm/web e2e`).
 
 Base de datos:
 
@@ -78,6 +86,20 @@ API (peticiones HTTP reales contra la aplicación completa):
 | Sucursales | Miembro limitado a una sucursal; límite del plan (402) y cambio de plan inmediato; desactivar conserva datos | 9 y 11 (parcial) |
 | Auditoría | Los cambios sensibles quedan registrados en la empresa correcta | Seguridad |
 
+Recorrido en navegador (Chrome, tamaño de celular y de computador; web, API y base reales, Supabase sustituido):
+
+1. Sin sesión, el panel lleva a iniciar sesión.
+2. Registro de la dueña.
+3. Una dirección web reservada se rechaza con mensaje claro y sin borrar lo escrito.
+4. Alta del negocio.
+5. La sucursal principal existe y el plan frena la segunda.
+6. Editar la sucursal.
+7. Dar acceso a una recepcionista.
+8. Guardar datos del negocio.
+9. Cerrar sesión y contraseña equivocada.
+10. La recepcionista invitada entra y ve solo lo de su rol.
+11. Vista de computador.
+
 Los escenarios 7 y 8, y lo que falta de 9, 11 y 12, dependen de módulos de fases posteriores.
 
 ## Dependencias
@@ -90,7 +112,6 @@ Los escenarios 7 y 8, y lo que falta de 9, 11 y 12, dependen de módulos de fase
 
 ## Próximas tareas
 
-1. `apps/web`: inicio de sesión con Supabase, registro de empresa y pantallas de sucursales y miembros.
-2. Aplicar las migraciones al proyecto de Supabase y desplegar API y web en un entorno de pruebas.
-3. Probar un inicio de sesión real de punta a punta (cierra el punto 1 de errores conocidos).
-4. Revisión de la fase 2 contigo y paso a la fase 3 (servicios, profesionales y horarios).
+1. Desplegar un entorno de pruebas: migraciones en Supabase, API y web publicadas.
+2. Probar registro, confirmación de correo e inicio de sesión reales (cierra el punto 1 de errores conocidos).
+3. Revisión de la fase 2 contigo y paso a la fase 3 (servicios, profesionales y horarios).

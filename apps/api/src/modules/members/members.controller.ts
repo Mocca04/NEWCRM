@@ -18,7 +18,7 @@ type MemberRow = { id: string; isActive: boolean; branchIds: string[]; createdAt
 const present = ({ user, ...member }: MemberRow) => ({
   ...member,
   user: { id: user.id, email: user.email, fullName: user.fullName },
-  /** true = fue invitado y aun no ha iniciado sesion. */
+  /** true = fue invitado y aún no ha iniciado sesión. */
   pending: user.authProviderId.startsWith(PENDING_PREFIX),
 });
 
@@ -39,11 +39,11 @@ export class MembersController {
 
   @Post()
   @RequirePermissions('members.manage')
-  @ApiOperation({ summary: 'Dar acceso a una persona por su correo. Entra cuando inicie sesion con ese correo confirmado.' })
+  @ApiOperation({ summary: 'Dar acceso a una persona por su correo. Entra cuando inicie sesión con ese correo confirmado.' })
   async invite(@CurrentUser() actor: AuthUser, @CurrentTenant() tenant: TenantContext, @Body() dto: InviteMemberDto) {
     const email = dto.email.toLowerCase();
     // La identidad es global: se resuelve como plataforma. El acceso a la
-    // empresa se crea despues dentro de su contexto RLS.
+    // empresa se crea después dentro de su contexto RLS.
     const user =
       (await this.db.platform.user.findUnique({ where: { email }, select: { id: true } })) ??
       (await this.db.platform.user.create({ data: { email, fullName: dto.fullName, authProviderId: `${PENDING_PREFIX}${email}` }, select: { id: true } }));
@@ -71,7 +71,7 @@ export class MembersController {
     return this.db.forTenant(tenant.id, async (tx) => {
       const before = await tx.tenantMembership.findFirst({ where: { id }, select: MEMBER_FIELDS });
       if (!before) throw new NotFoundException('Miembro no encontrado');
-      // Para tocar a alguien hay que tener, como minimo, sus mismos permisos.
+      // Para tocar a alguien hay que tener, como mínimo, sus mismos permisos.
       await this.assertAssignableRole(tx, tenant, before.role.id);
       if (dto.roleId) await this.assertAssignableRole(tx, tenant, dto.roleId);
       await this.assertBranches(tx, dto.branchIds);
@@ -95,7 +95,7 @@ export class MembersController {
     const role = await tx.role.findFirst({ where: { id: roleId }, select: { permissions: { select: { permission: { select: { code: true } } } } } });
     if (!role) throw new BadRequestException('El rol no existe en esta empresa');
     if (role.permissions.some((p) => !tenant.permissions.has(p.permission.code))) {
-      throw new ForbiddenException('No puede gestionar un rol con mas permisos que el suyo');
+      throw new ForbiddenException('No puede gestionar un rol con más permisos que el suyo');
     }
   }
 

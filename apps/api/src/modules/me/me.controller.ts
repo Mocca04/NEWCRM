@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthUser, CurrentUser, NoTenant } from '../../common/request-context';
 import { DbService } from '../../database/db.service';
 
-@ApiTags('Sesion')
+@ApiTags('Sesión')
 @ApiBearerAuth()
 @Controller('me')
 export class MeController {

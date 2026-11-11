@@ -19,7 +19,7 @@ export class RolesController {
   constructor(private readonly db: DbService) {}
 
   @Get('permissions')
-  @ApiOperation({ summary: 'Catalogo de permisos de la plataforma' })
+  @ApiOperation({ summary: 'Catálogo de permisos de la plataforma' })
   permissions(@CurrentTenant() tenant: TenantContext) {
     return this.db.forTenant(tenant.id, (tx) => tx.permission.findMany({ orderBy: { code: 'asc' }, select: { code: true, description: true } }));
   }

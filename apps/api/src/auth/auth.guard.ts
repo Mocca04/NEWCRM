@@ -6,7 +6,7 @@ import { InvalidTokenError, TOKEN_VERIFIER, TokenClaims, TokenVerifier } from '.
 
 export const PENDING_PREFIX = 'pending:';
 
-/** Autentica cada peticion con el token de Supabase y resuelve el usuario interno. */
+/** Autentica cada petición con el token de Supabase y resuelve el usuario interno. */
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
@@ -19,13 +19,13 @@ export class AuthGuard implements CanActivate {
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, [context.getHandler(), context.getClass()])) return true;
     const request = context.switchToHttp().getRequest<AppRequest>();
     const [scheme, token] = (request.headers.authorization ?? '').split(' ');
-    if (scheme !== 'Bearer' || !token) throw new UnauthorizedException('Falta el token de sesion');
+    if (scheme !== 'Bearer' || !token) throw new UnauthorizedException('Falta el token de sesión');
 
     let claims: TokenClaims;
     try {
       claims = await this.verifier.verify(token);
     } catch (error) {
-      if (error instanceof InvalidTokenError) throw new UnauthorizedException('Sesion invalida o vencida');
+      if (error instanceof InvalidTokenError) throw new UnauthorizedException('Sesión inválida o vencida');
       throw error;
     }
     request.user = await this.resolveUser(claims);
@@ -38,10 +38,10 @@ export class AuthGuard implements CanActivate {
     const existing = await users.findUnique({ where: { authProviderId: claims.sub }, select });
     if (existing) return existing;
 
-    if (!claims.email) throw new UnauthorizedException('La sesion no trae correo');
+    if (!claims.email) throw new UnauthorizedException('La sesión no trae correo');
     const byEmail = await users.findUnique({ where: { email: claims.email }, select: { id: true, authProviderId: true } });
     if (byEmail) {
-      // Usuario invitado que inicia sesion por primera vez: solo se enlaza si
+      // Usuario invitado que inicia sesión por primera vez: solo se enlaza si
       // el proveedor confirma que el correo es suyo.
       if (!byEmail.authProviderId.startsWith(PENDING_PREFIX) || !claims.emailVerified) {
         throw new ForbiddenException('Confirme su correo para acceder a esta cuenta');

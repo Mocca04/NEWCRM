@@ -32,7 +32,7 @@ export class BranchesController {
 
   @Post()
   @RequirePermissions('branches.manage')
-  @ApiOperation({ summary: 'Crear sucursal. Responde 402 si el plan no admite mas sucursales.' })
+  @ApiOperation({ summary: 'Crear sucursal. Responde 402 si el plan no admite más sucursales.' })
   create(@CurrentUser() user: AuthUser, @CurrentTenant() tenant: TenantContext, @Body() dto: CreateBranchDto) {
     return this.db.forTenant(tenant.id, async (tx) => {
       await this.assertPlanAllowsAnotherBranch(tx);
@@ -72,7 +72,7 @@ export class BranchesController {
   @Post(':id/activate')
   @HttpCode(200)
   @RequirePermissions('branches.manage')
-  @ApiOperation({ summary: 'Reactivar sucursal. Responde 402 si el plan no admite mas sucursales activas.' })
+  @ApiOperation({ summary: 'Reactivar sucursal. Responde 402 si el plan no admite más sucursales activas.' })
   activate(@CurrentUser() user: AuthUser, @CurrentTenant() tenant: TenantContext, @Param('id', ParseUUIDPipe) id: string) {
     return this.db.forTenant(tenant.id, async (tx) => {
       const branch = await this.findOrFail(tx, tenant, id);
@@ -97,10 +97,10 @@ export class BranchesController {
       where: { status: { in: ['TRIALING', 'ACTIVE', 'PAST_DUE'] } },
       select: { plan: { select: { name: true, maxBranches: true } } },
     });
-    if (!subscription) throw new HttpException('La empresa no tiene una suscripcion vigente', HttpStatus.PAYMENT_REQUIRED);
+    if (!subscription) throw new HttpException('La empresa no tiene una suscripción vigente', HttpStatus.PAYMENT_REQUIRED);
     const limit = subscription.plan.maxBranches;
     if (limit !== null && (await tx.branch.count({ where: { isActive: true, deletedAt: null } })) >= limit) {
-      throw new HttpException(`El plan ${subscription.plan.name} permite ${limit} sucursal(es). Cambie de plan para agregar mas.`, HttpStatus.PAYMENT_REQUIRED);
+      throw new HttpException(`El plan ${subscription.plan.name} permite ${limit} sucursal(es). Cambie de plan para agregar más.`, HttpStatus.PAYMENT_REQUIRED);
     }
   }
 }

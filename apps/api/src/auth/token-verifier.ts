@@ -40,7 +40,7 @@ export function remoteJwks(url: string, ttlMs = 10 * 60 * 1000): JwksProvider {
 }
 
 /**
- * Valida los tokens de sesion emitidos por Supabase Auth.
+ * Valida los tokens de sesión emitidos por Supabase Auth.
  * Firma asimetrica (ES256 / RS256) contra las llaves publicas del proyecto;
  * HS256 solo si se configura el secreto de un proyecto antiguo.
  */
@@ -58,11 +58,11 @@ export class SupabaseTokenVerifier implements TokenVerifier {
     const data = Buffer.from(`${headerPart}.${payloadPart}`);
     const signature = Buffer.from(signaturePart, 'base64url');
 
-    if (!(await this.signatureIsValid(header, data, signature))) throw new InvalidTokenError('firma invalida');
+    if (!(await this.signatureIsValid(header, data, signature))) throw new InvalidTokenError('firma inválida');
 
     const now = Math.floor((this.options.now?.() ?? Date.now()) / 1000);
     if (typeof payload.exp !== 'number' || payload.exp <= now) throw new InvalidTokenError('token vencido');
-    if (typeof payload.nbf === 'number' && payload.nbf > now + 30) throw new InvalidTokenError('token aun no vigente');
+    if (typeof payload.nbf === 'number' && payload.nbf > now + 30) throw new InvalidTokenError('token aún no vigente');
     if (payload.iss !== this.options.issuer) throw new InvalidTokenError('emisor no reconocido');
     const audience = this.options.audience ?? 'authenticated';
     const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];

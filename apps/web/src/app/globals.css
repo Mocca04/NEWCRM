@@ -1,0 +1,59 @@
+@import "tailwindcss";
+@import "@fontsource-variable/bricolage-grotesque/index.css";
+@import "@fontsource-variable/instrument-sans/index.css";
+
+/* Identidad: tinta azul noche, un solo acento fucsia de esmalte, fondo de espejo frio. */
+@theme {
+  --color-ink: #17202e;
+  --color-ink-soft: #55607a;
+  --color-mirror: #f2f4f7;
+  --color-line: #d8dde6;
+  --color-polish: #c2185b;
+  --color-polish-deep: #8e0f41;
+  --color-blush: #fce7ef;
+  --color-ok: #17734a;
+  --color-ok-soft: #e3f4ec;
+  --color-warn: #8a5300;
+  --color-warn-soft: #fdf1d8;
+  --font-display: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  background: var(--color-mirror);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-text-size-adjust: 100%;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-polish);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@layer components {
+  .field {
+    @apply block w-full rounded-lg border border-line bg-white px-3.5 py-3 text-base text-ink placeholder:text-ink-soft/60;
+  }
+  .field:focus-visible { outline-offset: 0; }
+  .btn {
+    @apply inline-flex min-h-12 items-center justify-center rounded-lg bg-ink px-5 text-base font-semibold text-white disabled:opacity-50;
+  }
+  .btn-quiet {
+    @apply inline-flex min-h-10 items-center justify-center rounded-lg border border-line bg-white px-4 text-sm font-semibold text-ink disabled:opacity-50;
+  }
+  .sheet {
+    @apply rounded-2xl border border-line bg-white;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

@@ -19,8 +19,10 @@
 6. Generar el cliente Prisma: `pnpm db:generate`
 7. Ejecutar las pruebas: `pnpm test`
 8. Arrancar la API: crear `apps/api/.env` con `DATABASE_URL` y `SUPABASE_URL`, y ejecutar `pnpm --filter @newcrm/api start:dev`. La documentación interactiva queda en `http://localhost:3001/api/docs`.
+9. Arrancar la web: crear `apps/web/.env.local` con `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `API_URL` y `NEXT_PUBLIC_SITE_URL`, y ejecutar `pnpm --filter @newcrm/web dev`. El panel queda en `http://localhost:3000`.
+10. Recorrido en navegador (requiere Google Chrome): `pnpm --filter @newcrm/web e2e`.
 
-Las pruebas crean y destruyen sus propias bases (`newcrm_test` y `newcrm_api_test`); no tocan la base de desarrollo.
+Las pruebas crean y destruyen sus propias bases (`newcrm_test`, `newcrm_api_test` y `newcrm_web_e2e`); no tocan la base de desarrollo.
 
 ## Cambiar el modelo de datos
 
@@ -39,3 +41,12 @@ Las pruebas crean y destruyen sus propias bases (`newcrm_test` y `newcrm_api_tes
 ## Usar Supabase en lugar de Docker
 
 Poner en `DATABASE_URL` la cadena de conexión directa del proyecto de Supabase (no la del agrupador en modo transacción para migrar) y ejecutar `pnpm db:migrate`. La migración de seguridad crea el rol `app_rls` y activa la extensión `btree_gist`.
+
+## Configurar Supabase Auth para la web
+
+En el panel de Supabase, en Authentication:
+
+1. **URL Configuration.** Poner en "Site URL" la dirección pública de la web y añadir `<esa dirección>/auth/confirm` a "Redirect URLs".
+2. **Plantilla de correo "Confirm signup".** El enlace debe apuntar a la web:
+   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`
+3. Mantener activa la confirmación de correo: es lo que impide que alguien reclame una invitación con un correo que no es suyo.
