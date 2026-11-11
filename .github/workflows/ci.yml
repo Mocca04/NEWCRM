@@ -4,10 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
 
 jobs:
   database:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     services:
       postgres:
         image: postgres:17
@@ -35,12 +38,16 @@ jobs:
         run: pnpm --filter @newcrm/database validate
       - name: Generar cliente Prisma
         run: pnpm --filter @newcrm/database generate
-      - name: Publicar el cliente generado
-        uses: actions/upload-artifact@v4
-        with:
-          name: prisma-client
-          path: packages/database/src/generated
-          retention-days: 7
+      - name: Publicar el cliente generado en la rama prisma-client
+        # El entorno de desarrollo asistido no puede descargar los motores de
+        # Prisma; toma el cliente ya generado de esta rama.
+        if: github.ref == 'refs/heads/main'
+        working-directory: packages/database/src/generated
+        run: |
+          git init -q -b prisma-client
+          git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "Cliente Prisma generado de $GITHUB_SHA"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" prisma-client
       - name: Aplicar migraciones con Prisma sobre una base vacia
         run: pnpm --filter @newcrm/database migrate
       - name: Verificar que las migraciones coinciden con schema.prisma
