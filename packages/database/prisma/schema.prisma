@@ -5,8 +5,9 @@
 // SQL dentro de prisma/migrations (Prisma no los modela).
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated"
+  provider     = "prisma-client"
+  output       = "../src/generated"
+  moduleFormat = "cjs"
 }
 
 datasource db {

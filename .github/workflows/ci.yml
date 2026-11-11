@@ -35,6 +35,12 @@ jobs:
         run: pnpm --filter @newcrm/database validate
       - name: Generar cliente Prisma
         run: pnpm --filter @newcrm/database generate
+      - name: Publicar el cliente generado
+        uses: actions/upload-artifact@v4
+        with:
+          name: prisma-client
+          path: packages/database/src/generated
+          retention-days: 7
       - name: Aplicar migraciones con Prisma sobre una base vacia
         run: pnpm --filter @newcrm/database migrate
       - name: Verificar que las migraciones coinciden con schema.prisma
