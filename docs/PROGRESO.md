@@ -1,6 +1,6 @@
 # Documento de progreso
 
-Última actualización: 11 de noviembre de 2026 · Fases 1 a 3 construidas y probadas en local y en integración continua · **Falta probarlas contra Supabase real en un entorno desplegado**
+Última actualización: 11 de noviembre de 2026 · Fases 1 a 4 construidas y probadas en local y en integración continua · **Falta probarlas contra Supabase real en un entorno desplegado**
 
 ## Funcionalidades terminadas
 
@@ -57,19 +57,47 @@ Panel web:
 
 Rutas nuevas: `GET|POST /service-categories`, `PATCH|DELETE /service-categories/:id`, `POST /catalog/templates`, `GET|POST /services`, `PATCH|DELETE /services/:id`, `PUT /services/:id/prices`, `GET|POST /employees`, `PATCH /employees/:id`, `POST /employees/:id/deactivate|activate`, `PUT /employees/:id/services`, `PUT /employees/:id/schedule`, `GET|POST /time-blocks`, `DELETE /time-blocks/:id`, `GET|POST /resources`, `PATCH /resources/:id`.
 
+### Fase 4 · Motor de disponibilidad, citas y agenda
+
+API:
+
+- Motor de disponibilidad que considera a la vez: horario del profesional, duración, preparación, limpieza, descansos, bloqueos y festivos, citas existentes, sucursal y recursos físicos. Trabaja en la zona horaria de la sucursal.
+- Varios servicios en una cita, encadenados; si los hace la misma persona no se deja limpieza ni preparación entre ellos. "Cualquier profesional" asigna a alguien habilitado que esté libre.
+- Crear cita con cliente nuevo o existente (un mismo teléfono no duplica al cliente), con los precios copiados al reservar y la tarifa propia del profesional si existe.
+- Reserva duplicada imposible: el motor valida y la base de datos rechaza el solape; la API responde 409. Si el profesional no se eligió a mano, vuelve a planear con otro libre.
+- `Idempotency-Key`: repetir la petición devuelve la cita original.
+- Mover una cita, cambiar sus servicios, confirmar, iniciar atención, completar, cancelar con motivo y registrar inasistencia. Repetir una acción no tiene efecto.
+- Clientes sin reserva (la cita nace en atención) y agendar fuera de horario solo si el personal lo pide; nunca encima de otra cita.
+- Citas recurrentes cada N semanas: agenda lo que cabe e informa las fechas con conflicto.
+- Cada cambio deja un evento en el outbox para notificaciones y fidelización (fases 7 y 10).
+- Un profesional con su cuenta vinculada ve solo sus citas.
+- Desactivar una sucursal informa cuántas citas futuras quedan; no acepta nuevas y conserva el historial.
+
+Panel web:
+
+- Agenda por día (una columna por profesional), semana y mes, por sucursal.
+- Nueva cita: servicios, profesional, día, horas libres reales, cliente, nota y repetición. Atención sin reserva.
+- Desde cada cita: confirmar, iniciar, completar, no asistió, mover y cancelar.
+- Inicio muestra las citas de hoy. La barra de celular queda en Inicio, Agenda, Servicios y Negocio.
+
+Rutas nuevas: `GET /availability`, `GET|POST /appointments`, `GET|PATCH /appointments/:id`, `POST /appointments/:id/confirm|start|complete|cancel|no-show`, `GET /customers`.
+
 ## Funcionalidades pendientes
 
 - Fase 2: recuperación de contraseña, envío de correo al invitar a un miembro, edición de roles personalizados y selector de negocio en celular (la API ya los soporta salvo el correo).
 - Fase 2: eliminación de una empresa y transferencia de propiedad.
-- Fase 3: pantallas para bloqueos y festivos, recursos físicos y tarifas por profesional (la API ya está; las pantallas se hacen junto con la agenda, donde se usan). Foto del profesional e imagen del servicio (dependen del almacenamiento de archivos). Vincular un profesional con su usuario para que vea solo su agenda (fase 4).
-- Fases 3 a 14. Ver el plan en el documento de arquitectura.
+- Fase 3: pantallas para bloqueos y festivos, recursos físicos y tarifas por profesional (la API ya está). Foto del profesional e imagen del servicio (dependen del almacenamiento de archivos).
+- Fase 4: políticas de cancelación configurables y anticipos con vencimiento (se construyen con el portal de reservas y los pagos, fases 5 y 6, que es donde aplican); cambiar los servicios de una cita desde la pantalla (la API ya lo permite); arrastrar citas en un calendario con cuadrícula de horas.
+- Fases 5 a 14. Ver el plan en el documento de arquitectura.
 
 ## Errores conocidos y puntos sin verificar
 
 1. **Inicio de sesión real con Supabase sin probar.** El entorno de desarrollo de Claude no puede conectarse a `supabase.co`. Las pruebas usan un sustituto local de Supabase Auth (`apps/web/e2e/fake-supabase.mjs`, solo para pruebas) que emite tokens con el mismo formato (ES256); la API los valida con su verificador real. Falta comprobar registro, confirmación de correo e inicio de sesión contra el proyecto verdadero. Eso solo se puede hacer con la web desplegada o corriendo en un computador con internet.
 2. **Proyectos antiguos de Supabase (HS256).** Hay soporte con `SUPABASE_JWT_SECRET`, pero esa ruta no tiene prueba automática.
 3. **Duraciones del catálogo inicial.** Son estimaciones mías para arrancar, no datos de ningún negocio; cada establecimiento debe ajustarlas.
-4. **El periodo de prueba no vence solo.** La empresa nace con una suscripción en prueba; el corte al vencer llega con la fase 11.
+4. **Elección de profesional con varios servicios.** Cuando no se elige profesional, el motor asigna servicio por servicio al primero que esté libre. En casos raros con varios servicios y varios profesionales puede no encontrar una combinación que sí existía; elegir el profesional a mano lo resuelve.
+5. **Citas que cruzan la medianoche.** No se pueden agendar dentro del horario normal; solo con la opción de fuera de horario.
+6. **El periodo de prueba no vence solo.** La empresa nace con una suscripción en prueba; el corte al vencer llega con la fase 11.
 
 Resueltos: los cinco puntos abiertos de la fase 1 se cerraron en la primera ejecución de la integración continua (Prisma valida, genera y migra; `prisma migrate diff` no reporta diferencias; pruebas en verde en PostgreSQL 17).
 
@@ -81,7 +109,7 @@ Notas de versiones y entorno:
 
 ## Pruebas realizadas
 
-66 pruebas automáticas contra PostgreSQL real, todas en verde (`pnpm test`): 36 de base de datos y 30 de la API de extremo a extremo. Además, un recorrido de 16 pasos en un navegador real, en tamaño de celular y de computador (`pnpm --filter @newcrm/web e2e`).
+91 pruebas automáticas, todas en verde (`pnpm test`): 36 de base de datos y 55 de la API (53 de extremo a extremo contra PostgreSQL real y 2 de zonas horarias). Además, un recorrido de 22 pasos en un navegador real, en tamaño de celular y de computador (`pnpm --filter @newcrm/web e2e`).
 
 Base de datos:
 
@@ -129,7 +157,13 @@ Recorrido en navegador (Chrome, tamaño de celular y de computador; web, API y b
 | Tarifas, bloqueos y recursos (fase 3) | Tarifas por profesional y sucursal sin duplicados; bloqueos por rango; recursos | Fase 3 |
 | Aislamiento del catálogo (fase 3) | Una empresa no ve ni usa servicios o profesionales de otra; recepción consulta pero no modifica; un administrador de una sucursal no toca las demás | 2 |
 
-Los escenarios 7 y 8, y lo que falta de 9, 11 y 12, dependen de módulos de fases posteriores.
+| Disponibilidad (fase 4) | Horas dentro del horario; descanso, preparación y limpieza respetados; días no laborables, bloqueos y festivos; recursos físicos | Cierre de fase 4 |
+| Reservas (fase 4) | Con 5 reservas simultáneas y 2 profesionales quedan exactamente 2; precios copiados; cliente no duplicado; llave de idempotencia; tarifa por profesional; series recurrentes con conflictos informados | 1 |
+| Estados (fase 4) | Flujo completo por API; con 3 "completar" simultáneos hay un solo evento; cancelar e inasistencia liberan el horario; mover no cae sobre otra cita | 3 |
+| Permisos de agenda (fase 4) | Un profesional ve solo sus citas y no puede crear ni cambiar; otra empresa no ve ni toca nada | 2 |
+| Sucursal desactivada (fase 4) | No recibe citas nuevas, informa las futuras, conserva el historial | 11 |
+
+Los escenarios 7 y 8, y lo que falta de 9 y 12, dependen de módulos de fases posteriores.
 
 ## Dependencias
 
@@ -143,4 +177,4 @@ Los escenarios 7 y 8, y lo que falta de 9, 11 y 12, dependen de módulos de fase
 
 1. Desplegar un entorno de pruebas: migraciones en Supabase, API y web publicadas. Requiere cuentas y secretos que solo puede crear el dueño del proyecto (ver `docs/despliegue.md`).
 2. Probar registro, confirmación de correo e inicio de sesión reales (cierra el punto 1 de errores conocidos).
-3. Fase 4: motor de disponibilidad, citas y calendario (escenarios 1, 3 y 11 a nivel de API).
+3. Fase 5: portal público de reservas para clientes y CRM (escenario 12).

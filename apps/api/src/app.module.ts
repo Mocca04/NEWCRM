@@ -7,6 +7,8 @@ import { DatabaseModule } from './database/database.module';
 import { CatalogController } from './modules/catalog/catalog.controller';
 import { EmployeesController } from './modules/employees/employees.controller';
 import { SchedulingController } from './modules/scheduling/scheduling.controller';
+import { AppointmentsController } from './modules/appointments/appointments.controller';
+import { CustomersController } from './modules/customers/customers.controller';
 import { BranchesController } from './modules/branches/branches.controller';
 import { HealthController } from './modules/health/health.controller';
 import { MeController } from './modules/me/me.controller';
@@ -17,7 +19,7 @@ import { TenantGuard } from './tenancy/tenant.guard';
 
 @Module({
   imports: [DatabaseModule],
-  controllers: [HealthController, MeController, TenantsController, BranchesController, MembersController, RolesController, CatalogController, EmployeesController, SchedulingController],
+  controllers: [HealthController, MeController, TenantsController, BranchesController, MembersController, RolesController, CatalogController, EmployeesController, SchedulingController, AppointmentsController, CustomersController],
   providers: [
     {
       provide: TOKEN_VERIFIER,

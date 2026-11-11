@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayUnique, IsArray, IsInt, IsNumber, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsInt, IsNumber, IsOptional, IsString, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 
 export class CreateEmployeeDto {
   @ApiProperty({ example: 'Laura Gómez' })
@@ -34,7 +34,13 @@ export class CreateEmployeeDto {
   @IsUUID('all', { each: true })
   serviceIds?: string[];
 }
-export class UpdateEmployeeDto extends PartialType(CreateEmployeeDto) {}
+export class UpdateEmployeeDto extends PartialType(CreateEmployeeDto) {
+  @ApiPropertyOptional({ nullable: true, description: 'Usuario con acceso al panel que corresponde a este profesional: le permite ver solo su agenda. null lo desvincula.' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  userId?: string | null;
+}
 
 export class SetEmployeeServicesDto {
   @ApiProperty()

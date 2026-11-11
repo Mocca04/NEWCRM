@@ -113,7 +113,7 @@ export async function updateEmployee(_: FormState, form: FormData): Promise<Form
   const body = employeeBody(form);
   if (Number.isNaN(body.commissionPercent)) return { error: 'La comisión es un porcentaje entre 0 y 100.' };
   try {
-    await api(`/employees/${text(form, 'id')}`, { method: 'PATCH', tenantId: active.tenant.id, body });
+    await api(`/employees/${text(form, 'id')}`, { method: 'PATCH', tenantId: active.tenant.id, body: { ...body, ...(form.has('userId') ? { userId: text(form, 'userId') ?? null } : {}) } });
   } catch (error) {
     return failure(error);
   }

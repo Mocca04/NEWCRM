@@ -2,7 +2,7 @@
 
 Plataforma SaaS de agenda, CRM y fidelización para manicuristas, barberías, peluquerías y estilistas en Colombia.
 
-Estado: **fases 1 a 3 de 14**. Están listos el modelo de datos, la API y el panel web de identidad, empresas, sucursales, equipo, servicios, profesionales y horarios. Falta la agenda (fase 4) y un entorno desplegado.
+Estado: **fases 1 a 4 de 14**. Están listos el modelo de datos, la API y el panel web: negocio, sucursales, equipo, servicios, profesionales, horarios y agenda con citas. Falta el portal público de reservas (fase 5) y un entorno desplegado.
 
 ## Qué hay en el repositorio
 

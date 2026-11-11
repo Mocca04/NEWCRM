@@ -64,8 +64,10 @@ export class BranchesController {
         throw new ConflictException('La empresa debe conservar al menos una sucursal activa');
       }
       const updated = await tx.branch.update({ where: { id }, data: { isActive: false }, select: FIELDS });
-      await audit(tx, { tenantId: tenant.id, actorUserId: user.id, action: 'branch.deactivated', entityType: 'branch', entityId: id });
-      return updated;
+      // Las citas ya agendadas no se tocan: se informan para reubicarlas o cancelarlas una a una.
+      const futureAppointments = await tx.appointment.count({ where: { branchId: id, startsAt: { gt: new Date() }, status: { in: ['PENDING', 'CONFIRMED'] } } });
+      await audit(tx, { tenantId: tenant.id, actorUserId: user.id, action: 'branch.deactivated', entityType: 'branch', entityId: id, after: { futureAppointments } });
+      return { ...updated, futureAppointments };
     });
   }
 

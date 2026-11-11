@@ -5,11 +5,12 @@ import { createEmployee, setEmployeeActive, setSchedule, updateEmployee } from '
 
 interface Slot { weekday: number; startTime: string; endTime: string }
 interface Employee {
-  id: string; branchId: string; fullName: string; specialties: string[]; commissionPercent: number;
+  id: string; branchId: string; userId: string | null; fullName: string; specialties: string[]; commissionPercent: number;
   isActive: boolean; serviceIds: string[]; schedule: Slot[];
 }
 interface Branch { id: string; name: string; isActive: boolean }
 interface Service { id: string; name: string }
+interface Member { user: { id: string; fullName: string; email: string }; isActive: boolean }
 
 function ServiceChecks({ services, selected = [] }: { services: Service[]; selected?: string[] }) {
   if (services.length === 0) return <p className="text-sm text-ink-soft">Cuando agregues servicios podrás marcar aquí cuáles hace.</p>;
@@ -106,6 +107,7 @@ export default async function EmployeesPage() {
     api<Service[]>('/services', { tenantId }),
   ]);
   const manage = can(active, 'employees.manage');
+  const members = manage && can(active, 'members.manage') ? (await api<Member[]>('/members', { tenantId })).filter((m) => m.isActive) : [];
   const branchName = (id: string) => branches.find((b) => b.id === id)?.name;
 
   return (
@@ -154,6 +156,14 @@ export default async function EmployeesPage() {
                           <input className="field" name="commissionPercent" inputMode="decimal" defaultValue={employee.commissionPercent} />
                         </Field>
                       </div>
+                      {members.length > 0 && (
+                        <Field label="Su cuenta de acceso" hint="Si esta persona entra al panel con su propia cuenta, elígela para que vea solo su agenda.">
+                          <select className="field" name="userId" defaultValue={employee.userId ?? ''}>
+                            <option value="">No tiene cuenta</option>
+                            {members.map((m) => <option key={m.user.id} value={m.user.id}>{m.user.fullName} ({m.user.email})</option>)}
+                          </select>
+                        </Field>
+                      )}
                       <ServiceChecks services={services} selected={employee.serviceIds} />
                     </ActionForm>
                     <ActionForm action={setEmployeeActive} submit={employee.isActive ? 'Desactivar profesional' : 'Reactivar profesional'} pending="Un momento…" quiet>

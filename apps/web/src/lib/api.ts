@@ -27,7 +27,7 @@ export interface Me {
 }
 
 /** Llama a la API con la sesión del usuario. Sin sesión valida, lleva a iniciar sesión. */
-export async function api<T>(path: string, options: { method?: string; body?: unknown; tenantId?: string } = {}): Promise<T> {
+export async function api<T>(path: string, options: { method?: string; body?: unknown; tenantId?: string; idempotencyKey?: string } = {}): Promise<T> {
   const supabase = await createClient();
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -41,6 +41,7 @@ export async function api<T>(path: string, options: { method?: string; body?: un
       headers: {
         Authorization: `Bearer ${token}`,
         ...(options.tenantId ? { 'X-Tenant-Id': options.tenantId } : {}),
+        ...(options.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : {}),
         ...(options.body === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),

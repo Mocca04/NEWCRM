@@ -8,7 +8,7 @@ import { DbService } from '../../database/db.service';
 import { CreateEmployeeDto, SetEmployeeServicesDto, SetScheduleDto, UpdateEmployeeDto } from './employees.dto';
 
 const FIELDS = {
-  id: true, branchId: true, fullName: true, photoUrl: true, specialties: true, commissionPercent: true, isActive: true,
+  id: true, branchId: true, userId: true, fullName: true, photoUrl: true, specialties: true, commissionPercent: true, isActive: true,
   services: { select: { serviceId: true } },
   schedules: { select: { weekday: true, startTime: true, endTime: true }, orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }] },
 } satisfies Prisma.EmployeeSelect;
@@ -82,6 +82,11 @@ export class EmployeesController {
         await this.assertBranch(tx, tenant, dto.branchId);
         // El horario pertenece a una sucursal: al cambiar de sede se mueve con la persona.
         await tx.employeeSchedule.updateMany({ where: { employeeId: id }, data: { branchId: dto.branchId } });
+      }
+      if (dto.userId) {
+        // Solo puede vincularse a alguien que ya tenga acceso a esta empresa.
+        if (!(await tx.tenantMembership.findFirst({ where: { userId: dto.userId }, select: { id: true } }))) throw new BadRequestException('Esa persona no tiene acceso a la empresa');
+        if (await tx.employee.findFirst({ where: { userId: dto.userId, deletedAt: null, NOT: { id } }, select: { id: true } })) throw new BadRequestException('Esa cuenta ya está vinculada a otro profesional');
       }
       await tx.employee.update({ where: { id }, data: dto });
       if (serviceIds) await this.replaceServices(tx, tenant.id, id, serviceIds);

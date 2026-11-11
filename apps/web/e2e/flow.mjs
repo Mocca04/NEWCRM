@@ -25,6 +25,17 @@ const open = async (page, name) => {
   }
   await page.getByRole('link', { name, exact: true }).first().click();
 };
+// Próximo lunes en Bogotá (el profesional de la prueba solo trabaja los lunes).
+const bogotaToday = new Date(Date.now() - 5 * 3_600_000);
+const monday = new Date(Date.UTC(bogotaToday.getUTCFullYear(), bogotaToday.getUTCMonth(), bogotaToday.getUTCDate() + (((8 - bogotaToday.getUTCDay()) % 7) || 7))).toISOString().slice(0, 10);
+const newAppointment = async (page) => {
+  await page.getByRole('link', { name: 'Nueva cita' }).click();
+  await page.getByRole('heading', { name: 'Nueva cita' }).waitFor();
+  await page.getByRole('checkbox', { name: /^Corte/ }).check();
+  await page.getByLabel('Día').fill(monday);
+  await submit(page, 'Ver horas disponibles');
+  await page.getByRole('button', { name: 'Agendar cita' }).waitFor();
+};
 const card = (page, tag, heading) => page.locator(tag, { has: page.getByRole('heading', { name: heading, exact: true }) });
 
 try {
@@ -133,7 +144,7 @@ try {
   });
 
   await step('profesionales: agregar con sus servicios', async () => {
-    await page.getByRole('link', { name: 'Profesionales', exact: true }).click();
+    await open(page, 'Profesionales');
     const add = page.locator('section', { hasText: 'Agregar profesional' });
     await add.getByLabel('Nombre').fill('Camilo Paz');
     await add.getByLabel('Corte', { exact: true }).check();
@@ -159,6 +170,90 @@ try {
     await shot(page, 'movil-profesionales');
     await page.getByRole('link', { name: 'Servicios', exact: true }).click();
     await card(page, 'li', 'Corte').getByText('1 profesional').waitFor();
+  });
+
+  await step('agenda: ver horas libres y agendar', async () => {
+    await page.getByRole('link', { name: 'Agenda', exact: true }).click();
+    await page.getByText('No hay citas este día').waitFor();
+    await shot(page, 'movil-agenda-vacia');
+    await newAppointment(page);
+    // Trabaja de 9 a 6 con descanso de 1 a 2: no se ofrece la 1 p. m. ni después de las 5:15.
+    assert.equal(await page.getByText(/^9:00\sa\.\sm\.$/).count(), 1);
+    assert.equal(await page.getByText(/^1:00\sp\.\sm\.$/).count(), 0);
+    assert.equal(await page.getByText(/^5:30\sp\.\sm\.$/).count(), 0);
+    await shot(page, 'movil-nueva-cita');
+    await page.getByText(/^10:00\sa\.\sm\.$/).click();
+    await page.getByLabel('Nombre del cliente', { exact: true }).fill('Marta Ruiz');
+    await page.locator('section', { hasText: 'Agendar cita' }).getByLabel(/^Celular/).fill('300 111 2233');
+    await submit(page, 'Agendar cita');
+    await page.waitForURL(`**/panel/agenda?fecha=${monday}`);
+    const marta = card(page, 'li', 'Marta Ruiz');
+    await marta.getByText('Confirmada').waitFor();
+    await marta.getByText(/10:00\sa\.\sm\. a 10:30\sa\.\sm\./).waitFor();
+  });
+
+  await step('agenda: el horario ocupado deja de ofrecerse', async () => {
+    await newAppointment(page);
+    assert.equal(await page.getByText(/^10:00\sa\.\sm\.$/).count(), 0);
+    assert.equal(await page.getByText(/^10:15\sa\.\sm\.$/).count(), 0);
+    await page.getByText(/^11:00\sa\.\sm\.$/).click();
+    await page.getByLabel('Nombre del cliente', { exact: true }).fill('Pedro Gil');
+    await page.locator('section', { hasText: 'Agendar cita' }).getByLabel(/^Celular/).fill('3005556677');
+    await submit(page, 'Agendar cita');
+    await page.waitForURL(`**/panel/agenda?fecha=${monday}`);
+    await card(page, 'li', 'Pedro Gil').waitFor();
+  });
+
+  await step('agenda: mover una cita y que no caiga sobre otra', async () => {
+    const pedro = card(page, 'li', 'Pedro Gil');
+    await pedro.getByText('Mover', { exact: true }).click();
+    await pedro.getByLabel('Nueva hora').fill('10:15');
+    await pedro.getByRole('button', { name: 'Mover cita' }).click();
+    await pedro.getByRole('alert').filter({ hasText: 'ya tiene ese horario ocupado' }).waitFor();
+    await pedro.getByLabel('Nueva hora').fill('15:00');
+    await pedro.getByRole('button', { name: 'Mover cita' }).click();
+    await card(page, 'li', 'Pedro Gil').getByText(/3:00\sp\.\sm\. a 3:30\sp\.\sm\./).waitFor();
+  });
+
+  await step('agenda: iniciar, completar y cancelar', async () => {
+    const marta = card(page, 'li', 'Marta Ruiz');
+    await marta.getByRole('button', { name: 'Iniciar atención' }).click();
+    await marta.getByText('En atención').waitFor();
+    await marta.getByRole('button', { name: 'Completar' }).click();
+    await marta.getByText('Completada').waitFor();
+    assert.equal(await marta.getByRole('button').count(), 0);
+    const pedro = card(page, 'li', 'Pedro Gil');
+    await pedro.getByText('Cancelar', { exact: true }).click();
+    await pedro.getByLabel('Motivo').fill('Avisó que no puede');
+    await pedro.getByRole('button', { name: 'Cancelar cita' }).click();
+    await pedro.getByText('Cancelada').waitFor();
+    await pedro.getByText('Motivo: Avisó que no puede').waitFor();
+    await shot(page, 'movil-agenda-dia');
+  });
+
+  await step('agenda: vistas de semana y mes', async () => {
+    await page.getByRole('link', { name: 'Semana', exact: true }).click();
+    await page.getByText('Marta Ruiz').waitFor();
+    await page.getByText('Corte con Camilo Paz').first().waitFor();
+    await shot(page, 'movil-agenda-semana');
+    await page.getByRole('link', { name: 'Mes', exact: true }).click();
+    await page.getByRole('link', { name: /: 1 cita$/ }).waitFor();
+    await shot(page, 'movil-agenda-mes');
+  });
+
+  await step('agenda: cliente sin reserva', async () => {
+    await page.getByRole('link', { name: 'Nueva cita' }).click();
+    const walkIn = page.locator('section', { hasText: 'Llegó sin reserva' });
+    await walkIn.getByLabel('Nombre del cliente sin reserva').fill('Sara Paz');
+    await walkIn.getByLabel('Celular del cliente sin reserva').fill('3009998877');
+    await walkIn.getByRole('button', { name: 'Atender ahora' }).click();
+    await page.waitForURL(/\/panel\/agenda\?fecha=\d{4}-\d{2}-\d{2}$/);
+    const sara = card(page, 'li', 'Sara Paz');
+    await sara.getByText('En atención').waitFor();
+    await sara.getByText(/sin reserva/).waitFor();
+    await page.getByRole('link', { name: 'Inicio', exact: true }).click();
+    await page.locator('section', { hasText: 'Hoy' }).getByText('Sara Paz').waitFor();
+    await shot(page, 'movil-inicio-con-citas');
   });
 
   await step('cerrar sesión y contraseña equivocada', async () => {
@@ -189,9 +284,12 @@ try {
     await page.getByRole('heading', { name: 'Corte', exact: true }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'Agregar servicio' }).count(), 0);
     assert.equal(await page.getByText('Editar', { exact: true }).count(), 0);
-    await page.getByRole('link', { name: 'Profesionales', exact: true }).click();
+    await open(page, 'Profesionales');
     await page.getByRole('heading', { name: 'Camilo Paz' }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'Agregar profesional' }).count(), 0);
+    // Recepción sí puede agendar.
+    await page.getByRole('link', { name: 'Agenda', exact: true }).click();
+    await page.getByRole('link', { name: 'Nueva cita' }).waitFor();
   });
 
   await step('vista de escritorio', async () => {
@@ -209,6 +307,9 @@ try {
     await wide.getByRole('link', { name: 'Profesionales', exact: true }).click();
     await wide.getByRole('heading', { name: 'Camilo Paz' }).waitFor();
     await shot(wide, 'escritorio-profesionales');
+    await wide.goto(`${WEB}/panel/agenda?fecha=${monday}`);
+    await wide.getByRole('heading', { name: 'Marta Ruiz' }).waitFor();
+    await shot(wide, 'escritorio-agenda');
   });
 
   console.log(`\n${steps.length} pasos correctos`);
