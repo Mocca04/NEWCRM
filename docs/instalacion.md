@@ -16,9 +16,11 @@
 4. Crear la base sombra que Prisma usa en desarrollo (una sola vez):
    `docker compose exec postgres psql -U postgres -c "CREATE DATABASE newcrm_shadow"`
 5. Aplicar las migraciones: `pnpm db:migrate`
-6. Ejecutar las pruebas: `pnpm test`
+6. Generar el cliente Prisma: `pnpm db:generate`
+7. Ejecutar las pruebas: `pnpm test`
+8. Arrancar la API: crear `apps/api/.env` con `DATABASE_URL` y `SUPABASE_URL`, y ejecutar `pnpm --filter @newcrm/api start:dev`. La documentación interactiva queda en `http://localhost:3001/api/docs`.
 
-Las pruebas crean y destruyen su propia base (`newcrm_test`); no tocan la base de desarrollo.
+Las pruebas crean y destruyen sus propias bases (`newcrm_test` y `newcrm_api_test`); no tocan la base de desarrollo.
 
 ## Cambiar el modelo de datos
 

@@ -64,3 +64,34 @@ valida la base de datos. Una transición inválida devuelve el código `23514`.
 
 Dinero en enteros, en centavos de COP. Fechas en `timestamptz`; cada sucursal
 tiene su zona horaria (`America/Bogota` por defecto).
+
+## API: quién es, a qué empresa entra y qué puede hacer
+
+Cada petición pasa por dos guardas globales, en este orden:
+
+1. **`AuthGuard`** valida el token de sesión de Supabase (firma ES256/RS256
+   contra las llaves públicas del proyecto, vencimiento, emisor y audiencia) y
+   resuelve el usuario interno. En el primer inicio de sesión lo crea; si la
+   persona fue invitada, la enlaza solo cuando Supabase confirma su correo.
+2. **`TenantGuard`** toma la empresa de la cabecera `X-Tenant-Id`, busca la
+   membresía activa del usuario y carga los permisos de su rol **desde la base
+   en cada petición**. Por eso quitar un permiso o desactivar a alguien tiene
+   efecto inmediato, sin esperar a que venza el token. Responde 403 igual si
+   la empresa no existe o si el usuario no pertenece a ella.
+
+Decoradores de ruta: `@Public()` (sin sesión), `@NoTenant()` (con sesión, sin
+empresa), `@RequirePermissions('codigo')`.
+
+Dentro de un controlador, todo acceso a datos de empresa va por
+`db.forTenant(tenant.id, tx => ...)`, que aplica RLS. `db.platform` no filtra y
+se reserva para identidad y alta de empresas.
+
+Reglas contra la escalada de privilegios:
+
+- Nadie concede un permiso que no tiene, ni asigna o modifica un rol con más
+  permisos que el suyo.
+- Nadie modifica su propio acceso ni su propio rol.
+- El rol Propietario no se edita y la empresa conserva siempre un Propietario activo.
+
+Límites por plan: los decide el backend. Crear o reactivar una sucursal por
+encima de `max_branches` responde 402.
